@@ -87,8 +87,8 @@ module RubyAbilityGraph
     def runner_script
       <<~RUBY
         require "json"
-        require #{File.expand_path("role_stand_in.rb", __dir__).inspect}
-        require #{File.expand_path("enumerator.rb", __dir__).inspect}
+        require #{File.expand_path('role_stand_in.rb', __dir__).inspect}
+        require #{File.expand_path('enumerator.rb', __dir__).inspect}
         #{ability_loading_lines}
         role_stand_ins = JSON.parse(#{@roles.to_json.inspect}).transform_values do |attrs|
           RubyAbilityGraph::RoleStandIn.new(attrs)
