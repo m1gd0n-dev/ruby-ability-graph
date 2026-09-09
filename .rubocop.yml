@@ -1,0 +1,41 @@
+AllCops:
+  TargetRubyVersion: 4.0
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "spec/fixtures/**/*"
+    - "vendor/**/*"
+
+# The codebase already uses double quotes consistently throughout --
+# matching that instead of rubocop's single-quotes default avoids a
+# 170+-offense, purely cosmetic rewrite with zero behavior change.
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+# `class Foo < StandardError; end`/`class Document; end` (custom error
+# classes, test fixtures) is idiomatic Ruby, not a real problem.
+Lint/EmptyClass:
+  Enabled: false
+
+# Defining a small test double/fixture class inline inside a `describe`
+# block (see enumerator_spec.rb's TestDocument/TestAbility) is a normal
+# RSpec idiom, not a real top-level-constants-in-weird-places problem.
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - "spec/**/*"
+
+# Harness#initialize's 8 params are all keyword args -- self-documenting at
+# every call site -- not the positional-args confusion this cop guards
+# against. The 8th (ruby_bin:, cross-Ruby-version target support) pushed
+# this past the default of 5.
+Metrics/ParameterLists:
+  Max: 8
+
+# CLI is a single cohesive command-dispatch class (two subcommands, each
+# broken into small single-purpose private methods for option parsing,
+# validation, and output) rather than needless multi-file ceremony for a
+# library this size. The line count is from method *count*, not any one
+# method being complex -- see the (comfortably-under-default) Metrics/*
+# complexity cops, which this class passes cleanly.
+Metrics/ClassLength:
+  Max: 150

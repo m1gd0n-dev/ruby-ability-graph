@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+
+abort "Usage: bin/rails runner SCRIPT" unless ARGV[0] == "runner" && ARGV[1]
+abort "RAILS_ENV not set" unless %w[test staging_test].include?(ENV["RAILS_ENV"])
+
+require "cancancan"
+require "zeitwerk"
+
+loader = Zeitwerk::Loader.new
+loader.push_dir(File.expand_path("../app/models", __dir__))
+loader.setup
+
+load ARGV[1]

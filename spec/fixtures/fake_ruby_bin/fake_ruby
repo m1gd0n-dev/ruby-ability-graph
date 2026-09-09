@@ -1,0 +1,6 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+File.write(ENV.fetch("FAKE_RUBY_BIN_MARKER"), "1") if ENV["FAKE_RUBY_BIN_MARKER"]
+
+exec("ruby", *ARGV)

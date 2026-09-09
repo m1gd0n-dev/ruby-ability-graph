@@ -1,0 +1,13 @@
+services:
+  ruby_ability_graph:
+    build: .
+    working_dir: /app
+
+    volumes:
+      - .:/app
+      - bundle_cache:/usr/local/bundle
+    entrypoint: ["bundle", "exec"]
+    command: ["rake", "spec"]
+
+volumes:
+  bundle_cache:

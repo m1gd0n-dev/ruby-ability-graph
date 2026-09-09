@@ -1,0 +1,5 @@
+admin:
+  admin?: true
+member:
+  admin?: false
+  id: 42
