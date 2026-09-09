@@ -85,19 +85,21 @@ module RubyAbilityGraph
     end
 
     def runner_script
-      role_stand_in_path = File.expand_path("role_stand_in.rb", __dir__)
-      enumerator_path = File.expand_path("enumerator.rb", __dir__)
-
       <<~RUBY
         require "json"
-        require #{role_stand_in_path.inspect}
-        require #{enumerator_path.inspect}
+        require #{File.expand_path("role_stand_in.rb", __dir__).inspect}
+        require #{File.expand_path("enumerator.rb", __dir__).inspect}
         #{ability_loading_lines}
         role_stand_ins = JSON.parse(#{@roles.to_json.inspect}).transform_values do |attrs|
           RubyAbilityGraph::RoleStandIn.new(attrs)
         end
-        ability_class = Object.const_get(#{@ability_class_name.inspect})
+        #{resolve_and_report_lines}
+      RUBY
+    end
 
+    def resolve_and_report_lines
+      <<~RUBY.chomp
+        ability_class = Object.const_get(#{@ability_class_name.inspect})
         results = RubyAbilityGraph::Enumerator.call(ability_class: ability_class, role_stand_ins: role_stand_ins)
         puts #{MARKER.inspect} + results.map(&:to_h).to_json
       RUBY

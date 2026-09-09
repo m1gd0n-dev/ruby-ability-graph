@@ -63,16 +63,16 @@ module RubyAbilityGraph
 
     def build_scan_option_parser(options)
       OptionParser.new do |opts|
-        opts.on("--roles-file FILE", "YAML file mapping role name => user stand-in attributes") do |v|
-          options[:roles_file] = v
-        end
+        add_roles_file_option!(opts, options)
         add_ability_file_option!(opts, options)
-        opts.on("--ruby-bin PATH", "Ruby executable for the target subprocess (default: " \
-                                   "\"ruby\" via PATH); target can use a different Ruby version. " \
-                                   "See README.") do |v|
-          options[:ruby_bin] = v
-        end
+        add_ruby_bin_option!(opts, options)
         add_loader_strategy_options!(opts, options)
+      end
+    end
+
+    def add_roles_file_option!(opts, options)
+      opts.on("--roles-file FILE", "YAML file mapping role name => user stand-in attributes") do |v|
+        options[:roles_file] = v
       end
     end
 
@@ -83,16 +83,36 @@ module RubyAbilityGraph
       end
     end
 
+    def add_ruby_bin_option!(opts, options)
+      opts.on("--ruby-bin PATH", "Ruby executable for the target subprocess (default: " \
+                                 "\"ruby\" via PATH); target can use a different Ruby version. " \
+                                 "See README.") do |v|
+        options[:ruby_bin] = v
+      end
+    end
+
     def add_loader_strategy_options!(opts, options)
+      add_require_option!(opts, options)
+      add_rails_boot_option!(opts, options)
+      add_rails_env_option!(opts, options)
+    end
+
+    def add_require_option!(opts, options)
       opts.on("--require FILE", "Path, relative to APP_PATH, to preload before the " \
                                 "Ability file (repeatable), see #2. Not compatible " \
                                 "with --rails-boot.") do |v|
         options[:requires] << v
       end
+    end
+
+    def add_rails_boot_option!(opts, options)
       opts.on("--rails-boot", "Run inside the target's own `bin/rails runner` for real " \
                               "Zeitwerk autoloading, see #3. Not compatible with --require.") do
         options[:rails_boot] = true
       end
+    end
+
+    def add_rails_env_option!(opts, options)
       opts.on("--rails-env ENV", "RAILS_ENV to boot under with --rails-boot (default: " \
                                  "#{RubyAbilityGraph::Harness::DEFAULT_RAILS_ENV.inspect}).") do |v|
         options[:rails_env] = v
