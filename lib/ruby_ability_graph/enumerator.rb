@@ -91,18 +91,20 @@ module RubyAbilityGraph
     end
 
     def classify(rule, model, index, rule_sources, dynamic_indices)
-      if dynamic_indices.include?(index)
-        return RuleClassifier::Classification.new(
-          confidence: "unsupported",
-          condition: nil,
-          reason: "dynamic_rule_generation",
-          source: source_snippet(rule_sources[index])
-        )
-      end
+      return dynamic_classification(rule_sources, index) if dynamic_indices.include?(index)
 
       classification = RuleClassifier.call(rule: rule, model: model)
       classification.source = source_snippet(rule_sources[index]) if classification.confidence == "unsupported"
       classification
+    end
+
+    def dynamic_classification(rule_sources, index)
+      RuleClassifier::Classification.new(
+        confidence: "unsupported",
+        condition: nil,
+        reason: "dynamic_rule_generation",
+        source: source_snippet(rule_sources[index])
+      )
     end
 
     # Every rule contributing to this (action, model) pair must itself be
