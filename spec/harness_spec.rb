@@ -22,7 +22,7 @@ RSpec.describe RubyAbilityGraph::Harness do
   end
 end
 
-RSpec.describe RubyAbilityGraph::Harness, "condition classification, end-to-end through the subprocess (#4)" do
+RSpec.describe RubyAbilityGraph::Harness, "condition classification, end-to-end through the subprocess" do
   let(:app_path) { fixture_path("conditions_app") }
   let(:roles) { roles_for(app_path) }
 
@@ -39,7 +39,7 @@ RSpec.describe RubyAbilityGraph::Harness, "condition classification, end-to-end 
     expect(result["condition"]).to eq("team_id" => 7)
   end
 
-  it "resolves a combination of an unconditional `can` and a flat-hash `cannot` (#1.7)" do
+  it "resolves a combination of an unconditional `can` and a flat-hash `cannot`" do
     result = result_for(results, role: "member", action: "update", model: "Document")
     expect(result["confidence"]).to eq("resolved")
     expect(result["condition"]).to eq("archived" => true)

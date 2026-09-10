@@ -5,8 +5,8 @@ require_relative "rule_classifier"
 module RubyAbilityGraph
   # Runs a loaded Ability class's can? checks across every role x declared
   # action x declared model combination, classifying each result as
-  # resolved/unsupported (per RuleClassifier + v1scopespec.md) rather than
-  # returning a bare boolean.
+  # resolved/unsupported (via RuleClassifier) rather than returning a bare
+  # boolean.
   class Enumerator
     Result = Struct.new(
       :role, :action, :model, :allowed, :confidence, :condition, :reasons, :sources, keyword_init: true
@@ -16,7 +16,7 @@ module RubyAbilityGraph
     # Records where each rule was declared, by wrapping CanCan::Ability's own
     # rule-append point. Lets unsupported results point back to source, and
     # lets us notice the same line firing more than once per instantiation --
-    # a direct signal of loop-built rules (v1scopespec.md #2 item 4).
+    # a direct signal of loop-built rules.
     module RuleSourceRecording
       def add_rule(rule)
         (@rag_rule_sources ||= []) << caller_locations.find { |loc| !loc.path.include?("cancancan") }
@@ -105,10 +105,9 @@ module RubyAbilityGraph
       classification
     end
 
-    # Per v1scopespec.md #1 item 7: every rule contributing to this
-    # (action, model) pair must itself be resolved for the combined result
-    # to be resolved -- we trust can? for the boolean, not our own guess at
-    # resolution order.
+    # Every rule contributing to this (action, model) pair must itself be
+    # resolved for the combined result to be resolved -- we trust can? for
+    # the boolean, not our own guess at resolution order.
     def verdict(classifications)
       unsupported = classifications.reject { |c| c.confidence == "resolved" }
       return resolved_verdict(classifications) if unsupported.empty?

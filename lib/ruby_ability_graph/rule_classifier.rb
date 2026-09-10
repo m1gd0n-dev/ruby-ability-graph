@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module RubyAbilityGraph
-  # Classifies a single CanCan::Rule's condition per v1scopespec.md:
+  # Classifies a single CanCan::Rule's condition:
   # "resolved" (unconditional or flat scalar hash, fully structured) or
   # "unsupported" (block, association-reaching, or otherwise opaque).
   # Shape only -- source/dynamic-generation handling lives in Enumerator.
@@ -44,7 +44,6 @@ module RubyAbilityGraph
 
     # Deliberately no special-casing by key name (e.g. tenant_id/team_id) --
     # a flat scalar comparison is resolved regardless of what it's called.
-    # See v1scopespec.md #2 item 5.
     def association_key?(key)
       @model.respond_to?(:reflect_on_association) && !@model.reflect_on_association(key).nil?
     end

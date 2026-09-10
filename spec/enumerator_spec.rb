@@ -119,7 +119,7 @@ RSpec.describe RubyAbilityGraph::Enumerator do
     expect(result.reasons).to include("dynamic_rule_generation")
   end
 
-  it "resolves a single `can` call covering multiple actions and models (#1.4)" do
+  it "resolves a single `can` call covering multiple actions and models" do
     stand_ins = { "member" => RubyAbilityGraph::RoleStandIn.new }
     scoped_results = described_class.call(ability_class: TestAbilityWithMultiActionModel, role_stand_ins: stand_ins)
 

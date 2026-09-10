@@ -6,7 +6,7 @@ require_relative "report"
 
 # One action per classification scenario, so each (action, model) cell in
 # the test results has exactly one contributing rule to reason about --
-# except :update, which deliberately combines two resolved rules (#1.7).
+# except :update, which deliberately combines two resolved rules.
 class Ability
   include CanCan::Ability
 
