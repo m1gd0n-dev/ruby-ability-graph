@@ -8,8 +8,9 @@ module RubyAbilityGraph
   # resolved/unsupported (per RuleClassifier + v1scopespec.md) rather than
   # returning a bare boolean.
   class Enumerator
-    Result = Struct.new(:role, :action, :model, :allowed, :confidence, :condition, :reasons, :sources,
-                         keyword_init: true)
+    Result = Struct.new(
+      :role, :action, :model, :allowed, :confidence, :condition, :reasons, :sources, keyword_init: true
+    )
     DEFAULT_ACTIONS = %i[index show create update destroy manage read].freeze
 
     # Records where each rule was declared, by wrapping CanCan::Ability's own
@@ -91,9 +92,12 @@ module RubyAbilityGraph
 
     def classify(rule, model, index, rule_sources, dynamic_indices)
       if dynamic_indices.include?(index)
-        return RuleClassifier::Classification.new(confidence: "unsupported", condition: nil,
-                                                    reason: "dynamic_rule_generation",
-                                                    source: source_snippet(rule_sources[index]))
+        return RuleClassifier::Classification.new(
+          confidence: "unsupported",
+          condition: nil,
+          reason: "dynamic_rule_generation",
+          source: source_snippet(rule_sources[index])
+        )
       end
 
       classification = RuleClassifier.call(rule: rule, model: model)
@@ -119,7 +123,7 @@ module RubyAbilityGraph
 
     def resolved_verdict(classifications)
       conditions = classifications.filter_map(&:condition)
-      condition = conditions.empty? ? nil : (conditions.size == 1 ? conditions.first : conditions)
+      condition = conditions.size <= 1 ? conditions.first : conditions
       { confidence: "resolved", condition: condition, reasons: [], sources: [] }
     end
 

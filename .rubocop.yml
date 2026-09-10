@@ -32,3 +32,9 @@ Metrics/ParameterLists:
 # Metrics/* complexity cops, which this class passes cleanly.
 Metrics/ClassLength:
   Max: 165
+
+# RSpec.describe blocks routinely run long once a fixture covers several
+# scenarios -- that's example count, not complexity.
+Metrics/BlockLength:
+  Exclude:
+    - "spec/**/*"

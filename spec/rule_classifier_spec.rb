@@ -8,10 +8,10 @@ class ClassifierTestDocument
   end
 end
 
-def rule_for(&block)
+def rule_for(&)
   ability_class = Class.new { include CanCan::Ability }
   ability = ability_class.new
-  ability.instance_eval(&block)
+  ability.instance_eval(&)
   ability.send(:rules).last
 end
 
