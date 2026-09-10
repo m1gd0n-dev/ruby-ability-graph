@@ -1,0 +1,6 @@
+admin:
+  admin?: true
+member:
+  admin?: false
+  team_id: 7
+  extra_team_ids: [1, 2]

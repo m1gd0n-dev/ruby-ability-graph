@@ -2,7 +2,7 @@
 
 Loads a Rails app's [CanCanCan](https://github.com/CanCanCommunity/cancancan) `Ability` class in isolation and reports raw `can?`/`cannot?` results across every role x action x model combination -- so you can see who can access what without booting the full app or hand-tracing every conditional.
 
-**Status:** This currently reports raw `can?`/`cannot?` capture only; condition structuring and a resolved/unsupported classification are planned for v1.
+**Status:** Each result is now classified `resolved` (structured condition captured) or `unsupported` (declared but not analyzed, with a reason and source pointer) per the v1 scope contract. Table/HTML output and a policy-check mode are still planned.
 
 ## Installation
 
@@ -57,8 +57,13 @@ This loads your `Ability` class in a subprocess, runs `can?` for every role x ac
 ```json
 {
   "raw_results": [
-    { "role": "admin", "action": "read", "model": "Document", "allowed": true },
-    { "role": "member", "action": "destroy", "model": "Document", "allowed": false }
+    { "role": "admin", "action": "read", "model": "Document", "allowed": true,
+      "confidence": "resolved", "condition": null, "reasons": [], "sources": [] },
+    { "role": "member", "action": "read", "model": "Document", "allowed": true,
+      "confidence": "resolved", "condition": { "team_id": 7 }, "reasons": [], "sources": [] },
+    { "role": "member", "action": "update", "model": "Document", "allowed": true,
+      "confidence": "unsupported", "condition": null, "reasons": ["block_condition"],
+      "sources": [{ "file": "app/models/ability.rb", "line": 12, "text": "can :update, Document do |doc| ... end" }] }
   ]
 }
 ```

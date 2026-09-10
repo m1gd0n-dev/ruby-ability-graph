@@ -22,6 +22,62 @@ RSpec.describe RubyAbilityGraph::Harness do
   end
 end
 
+RSpec.describe RubyAbilityGraph::Harness, "condition classification, end-to-end through the subprocess (#4)" do
+  let(:app_path) { fixture_path("conditions_app") }
+  let(:roles) { roles_for(app_path) }
+
+  subject(:results) { described_class.new(app_path: app_path, roles: roles).run }
+
+  it "resolves an unconditional grant, differently classified per role" do
+    expect(result_for(results, role: "admin", action: "read", model: "Document")["confidence"]).to eq("resolved")
+    expect(result_for(results, role: "member", action: "read", model: "Document")["confidence"]).to eq("resolved")
+  end
+
+  it "resolves a flat hash condition with its structured condition surviving the JSON round-trip" do
+    result = result_for(results, role: "member", action: "read", model: "Document")
+    expect(result["confidence"]).to eq("resolved")
+    expect(result["condition"]).to eq("team_id" => 7)
+  end
+
+  it "resolves a combination of an unconditional `can` and a flat-hash `cannot` (#1.7)" do
+    result = result_for(results, role: "member", action: "update", model: "Document")
+    expect(result["confidence"]).to eq("resolved")
+    expect(result["condition"]).to eq("archived" => true)
+  end
+
+  it "flags a block condition as unsupported, with a reason and source" do
+    result = result_for(results, role: "member", action: "destroy", model: "Document")
+    expect(result["confidence"]).to eq("unsupported")
+    expect(result["reasons"]).to include("block_condition")
+    expect(result["sources"].first["text"]).to include("can(:destroy")
+  end
+
+  it "flags a nested hash condition as association-chained" do
+    result = result_for(results, role: "member", action: "export", model: "Document")
+    expect(result["confidence"]).to eq("unsupported")
+    expect(result["reasons"]).to include("association_chained")
+  end
+
+  it "flags a flat key naming a real association as requiring traversal" do
+    result = result_for(results, role: "member", action: "archive", model: "Document")
+    expect(result["confidence"]).to eq("unsupported")
+    expect(result["reasons"]).to include("requires_association_traversal")
+  end
+
+  it "flags rules built in a loop as unsupported due to dynamic rule generation" do
+    result = result_for(results, role: "member", action: "read", model: "Report")
+    expect(result["confidence"]).to eq("unsupported")
+    expect(result["reasons"]).to include("dynamic_rule_generation")
+  end
+
+  it "does not mistake ordinary role branching for dynamic rule generation" do
+    %w[admin member].each do |role|
+      result = result_for(results, role: role, action: "read", model: "Document")
+      expect(result["reasons"]).not_to include("dynamic_rule_generation")
+    end
+  end
+end
+
 RSpec.describe RubyAbilityGraph::Harness, "with ruby_bin: (cross-Ruby-version target support)" do
   let(:app_path) { fixture_path("toy_app") }
   let(:roles) { roles_for(app_path) }
