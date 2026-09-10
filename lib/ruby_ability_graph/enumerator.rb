@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "rule_classifier"
+
 module RubyAbilityGraph
   # Runs a loaded Ability class's can? checks across every role x declared
   # action x declared model combination, classifying each result as
