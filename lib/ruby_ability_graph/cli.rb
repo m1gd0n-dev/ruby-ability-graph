@@ -36,8 +36,9 @@ module RubyAbilityGraph
       results = RubyAbilityGraph::Harness.new(**harness_kwargs(options, app_path, roles)).run
       violations = load_policy_violations(options[:policy_file], app_path, results)
 
-      presenter = RubyAbilityGraph::ScanPresenter.new(format: options[:format], results: results,
-                                                       violations: violations)
+      presenter = RubyAbilityGraph::ScanPresenter.new(
+        format: options[:format], results: results, violations: violations
+      )
       puts presenter.render
       exit(1) if presenter.violations?
     end
