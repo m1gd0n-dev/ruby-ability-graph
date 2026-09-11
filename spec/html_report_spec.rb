@@ -24,8 +24,15 @@ RSpec.describe RubyAbilityGraph::HtmlReport do
   it "renders a self-contained HTML document with no external requests" do
     html = described_class.call(results: results)
     expect(html).to start_with("<!doctype html>")
-    expect(html).not_to match(%r{https?://})
+    # Not a blanket "no http(s)://" -- the SVG namespace URI
+    # (http://www.w3.org/2000/svg) is a required createElementNS constant,
+    # not a network request. Check for actual resource-fetching constructs
+    # instead.
     expect(html).not_to include("<link ")
+    expect(html).not_to match(/<script\s+[^>]*\bsrc=/)
+    expect(html).not_to match(/\bfetch\s*\(/)
+    expect(html).not_to include("XMLHttpRequest")
+    expect(html).not_to include("@import")
   end
 
   it "only embeds allowed rows -- denials aren't graph edges" do
