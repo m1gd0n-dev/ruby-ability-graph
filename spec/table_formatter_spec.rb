@@ -20,7 +20,7 @@ RSpec.describe RubyAbilityGraph::TableFormatter do
 
   it "renders a row per result, condition rendered as-is and nil as a dash" do
     expect(table).to match(/admin\s+read\s+Document\s+true\s+resolved\s+-/)
-    expect(table).to include('{"team_id"=>7}')
+    expect(table).to include({ "team_id" => 7 }.to_s)
   end
 
   it "sorts rows by role, then model, then action" do

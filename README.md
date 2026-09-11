@@ -59,7 +59,7 @@ By default it prints a human-readable table plus a resolved/unsupported coverage
 ```
 ROLE    ACTION  MODEL     ALLOWED  CONFIDENCE   CONDITION
 admin   read    Document  true     resolved     -
-member  read    Document  true     resolved     {"team_id"=>7}
+member  read    Document  true     resolved     {"team_id" => 7}
 member  update  Document  true     unsupported  -
 
 2/3 resolved (66.7%)
