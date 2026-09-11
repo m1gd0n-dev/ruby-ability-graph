@@ -20,6 +20,46 @@ RSpec.describe RubyAbilityGraph::CLI do
 
     expect do
       described_class.start(["scan", app_path, "--ruby-bin", fake_ruby_bin])
-    end.to output(/"raw_results"/).to_stdout
+    end.to output(/resolved \(/).to_stdout
+  end
+
+  it "defaults to a human-readable table" do
+    expect do
+      described_class.start(["scan", app_path])
+    end.to output(/ROLE\s+ACTION\s+MODEL\s+ALLOWED\s+CONFIDENCE\s+CONDITION/).to_stdout
+  end
+
+  it "prints the versioned JSON schema with --format json" do
+    expect do
+      described_class.start(["scan", app_path, "--format", "json"])
+    end.to output(/"schema_version": 1.*"results"/m).to_stdout
+  end
+
+  it "rejects an unrecognized --format value" do
+    expect do
+      described_class.start(["scan", app_path, "--format", "yaml"])
+    end.to raise_error(OptionParser::InvalidArgument)
+  end
+
+  context "with --policy-file" do
+    it "reports no violations, without exiting, when the policy holds" do
+      expect do
+        described_class.start(["scan", app_path, "--policy-file", "policy_ok.yml"])
+      end.to output(/no violations/).to_stdout
+    end
+
+    it "flags a role that can do more than the policy allows, and exits non-zero" do
+      expect do
+        described_class.start(["scan", app_path, "--policy-file", "policy_violation.yml"])
+      end.to output(/Policy violations \(1\):.*member can read Document/m).to_stdout.and raise_error(SystemExit) { |e|
+        expect(e.status).to eq(1)
+      }
+    end
+
+    it "includes policy_violations in JSON output" do
+      expect do
+        described_class.start(["scan", app_path, "--policy-file", "policy_violation.yml", "--format", "json"])
+      end.to output(/"policy_violations"/).to_stdout.and raise_error(SystemExit)
+    end
   end
 end

@@ -11,7 +11,7 @@ module RubyAbilityGraph
     USAGE = <<~USAGE.chomp
       Usage: ruby-ability-graph scan APP_PATH [--roles-file FILE] [--ability-file FILE]
                                                [--require FILE]... | [--rails-boot [--rails-env ENV]]
-                                               [--ruby-bin PATH]
+                                               [--ruby-bin PATH] [--format table|json] [--policy-file FILE]
              ruby-ability-graph inspect APP_PATH [--ability-file FILE]
     USAGE
 
@@ -31,21 +31,15 @@ module RubyAbilityGraph
     private
 
     def scan(argv)
-      options, app_path = parse_scan_args(argv)
+      options, app_path = RubyAbilityGraph::ScanOptions.parse(argv)
       roles = load_roles(options[:roles_file], app_path)
       results = RubyAbilityGraph::Harness.new(**harness_kwargs(options, app_path, roles)).run
-      puts JSON.pretty_generate("raw_results" => results)
-    end
+      violations = load_policy_violations(options[:policy_file], app_path, results)
 
-    def parse_scan_args(argv)
-      options = { ability_file: RubyAbilityGraph::Harness::DEFAULT_ABILITY_FILE, requires: [], rails_boot: false }
-      build_scan_option_parser(options).parse!(argv)
-
-      app_path = argv.shift
-      abort(USAGE) unless app_path
-
-      validate_scan_options!(options)
-      [options, app_path]
+      presenter = RubyAbilityGraph::ScanPresenter.new(format: options[:format], results: results,
+                                                       violations: violations)
+      puts presenter.render
+      exit(1) if presenter.violations?
     end
 
     def harness_kwargs(options, app_path, roles)
@@ -61,72 +55,16 @@ module RubyAbilityGraph
       kwargs
     end
 
-    def build_scan_option_parser(options)
-      OptionParser.new do |opts|
-        add_roles_file_option!(opts, options)
-        add_ability_file_option!(opts, options)
-        add_ruby_bin_option!(opts, options)
-        add_loader_strategy_options!(opts, options)
-      end
-    end
+    # nil (not merely empty) means "no --policy-file given" -- ScanPresenter
+    # uses that distinction to decide whether to print a policy section at all.
+    def load_policy_violations(policy_file, app_path, results)
+      return nil unless policy_file
 
-    def add_roles_file_option!(opts, options)
-      opts.on("--roles-file FILE", "YAML file mapping role name => user stand-in attributes") do |v|
-        options[:roles_file] = v
-      end
-    end
+      path = File.expand_path(policy_file, app_path)
+      abort("No policy file found at #{path}.") unless File.exist?(path)
 
-    # Shared with `inspect`'s option parser -- both subcommands take the same --ability-file flag.
-    def add_ability_file_option!(opts, options)
-      opts.on("--ability-file FILE", "Path to the Ability class file, relative to APP_PATH") do |v|
-        options[:ability_file] = v
-      end
-    end
-
-    def add_ruby_bin_option!(opts, options)
-      opts.on("--ruby-bin PATH", "Ruby executable for the target subprocess (default: " \
-                                 "\"ruby\" via PATH); target can use a different Ruby version. " \
-                                 "See README.") do |v|
-        options[:ruby_bin] = v
-      end
-    end
-
-    def add_loader_strategy_options!(opts, options)
-      add_require_option!(opts, options)
-      add_rails_boot_option!(opts, options)
-      add_rails_env_option!(opts, options)
-    end
-
-    def add_require_option!(opts, options)
-      opts.on("--require FILE", "Path, relative to APP_PATH, to preload before the " \
-                                "Ability file (repeatable), see #2. Not compatible " \
-                                "with --rails-boot.") do |v|
-        options[:requires] << v
-      end
-    end
-
-    def add_rails_boot_option!(opts, options)
-      opts.on("--rails-boot", "Run inside the target's own `bin/rails runner` for real " \
-                              "Zeitwerk autoloading, see #3. Not compatible with --require.") do
-        options[:rails_boot] = true
-      end
-    end
-
-    def add_rails_env_option!(opts, options)
-      opts.on("--rails-env ENV", "RAILS_ENV to boot under with --rails-boot (default: " \
-                                 "#{RubyAbilityGraph::Harness::DEFAULT_RAILS_ENV.inspect}).") do |v|
-        options[:rails_env] = v
-      end
-    end
-
-    def validate_scan_options!(options)
-      abort("--rails-env only applies with --rails-boot.") if options[:rails_env] && !options[:rails_boot]
-
-      return unless options[:rails_boot] && !options[:requires].empty?
-
-      abort("--require is not compatible with --rails-boot -- once Zeitwerk is live via bin/rails runner, " \
-            "referenced classes resolve on their own; a manual --require list is superfluous. " \
-            "Drop one or the other.")
+      policies = YAML.safe_load_file(path)["policies"] || []
+      RubyAbilityGraph::PolicyChecker.call(policies: policies, results: results)
     end
 
     def inspect_ability(argv)
@@ -145,7 +83,9 @@ module RubyAbilityGraph
     def parse_inspect_args(argv)
       options = { ability_file: RubyAbilityGraph::Harness::DEFAULT_ABILITY_FILE }
       OptionParser.new do |opts|
-        add_ability_file_option!(opts, options)
+        opts.on("--ability-file FILE", "Path to the Ability class file, relative to APP_PATH") do |v|
+          options[:ability_file] = v
+        end
       end.parse!(argv)
 
       app_path = argv.shift

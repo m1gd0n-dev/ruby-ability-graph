@@ -2,7 +2,7 @@
 
 Loads a Rails app's [CanCanCan](https://github.com/CanCanCommunity/cancancan) `Ability` class in isolation and reports raw `can?`/`cannot?` results across every role x action x model combination -- so you can see who can access what without booting the full app or hand-tracing every conditional.
 
-**Status:** Each result is now classified `resolved` (structured condition captured) or `unsupported` (declared but not analyzed, with a reason and source pointer) per the v1 scope contract. Table/HTML output and a policy-check mode are still planned.
+**Status:** Each result is classified `resolved` (structured condition captured) or `unsupported` (declared but not analyzed, with a reason and source pointer). `scan` prints a human-readable table by default, a versioned JSON schema on request, and can diff results against a simple policy file. HTML output is still planned.
 
 ## Installation
 
@@ -49,14 +49,28 @@ member:
 ```
 ruby-ability-graph scan APP_PATH [--roles-file FILE] [--ability-file FILE]
                                   [--require FILE]... | [--rails-boot [--rails-env ENV]]
-                                  [--ruby-bin PATH]
+                                  [--ruby-bin PATH] [--format table|json] [--policy-file FILE]
 ```
 
-This loads your `Ability` class in a subprocess, runs `can?` for every role x action x model combination it finds, and prints the results as JSON:
+This loads your `Ability` class in a subprocess and runs `can?` for every role x action x model combination it finds.
+
+By default it prints a human-readable table plus a resolved/unsupported coverage line:
+
+```
+ROLE    ACTION  MODEL     ALLOWED  CONFIDENCE   CONDITION
+admin   read    Document  true     resolved     -
+member  read    Document  true     resolved     {"team_id"=>7}
+member  update  Document  true     unsupported  -
+
+2/3 resolved (66.7%)
+```
+
+Pass `--format json` for the same data as structured, versioned JSON instead:
 
 ```json
 {
-  "raw_results": [
+  "schema_version": 1,
+  "results": [
     { "role": "admin", "action": "read", "model": "Document", "allowed": true,
       "confidence": "resolved", "condition": null, "reasons": [], "sources": [] },
     { "role": "member", "action": "read", "model": "Document", "allowed": true,
@@ -77,6 +91,31 @@ This loads your `Ability` class in a subprocess, runs `can?` for every role x ac
 | `--require FILE` (repeatable) | -- | Preload a file your `Ability` class references but doesn't require itself. Not compatible with `--rails-boot` |
 | `--rails-boot [--rails-env ENV]` | off / `test` | Boot via the target's own `bin/rails runner` so real Zeitwerk autoloading resolves everything -- no manual `--require` list needed. Not compatible with `--require` |
 | `--ruby-bin PATH` | `ruby` (via `PATH`) | Ruby executable for the analysis subprocess, if the target app needs a different Ruby version than this gem runs under |
+| `--format table\|json` | `table` | `table` for a terminal-friendly summary, `json` for the versioned schema above |
+| `--policy-file FILE` | -- | Run a policy check against the results (see below); path is relative to `APP_PATH` |
+
+### 4. Policy checks (optional)
+
+Declare who's *supposed* to be able to do what, and let `scan` flag any role that can actually do more. The policy language is deliberately flat -- `model` + `action` + `allowed_roles`, no nested logic:
+
+```yaml
+# policy.yml
+policies:
+  - model: Payment
+    action: read
+    allowed_roles: [admin]
+  - model: Document
+    action: destroy
+    allowed_roles: [admin, owner]
+```
+
+```
+ruby-ability-graph scan APP_PATH --policy-file policy.yml
+```
+
+A violation is any `(role, action, model)` combination the scan found `allowed: true` for, where `role` isn't in that policy's `allowed_roles`. Violations are appended to the table (or the `"policy_violations"` key in JSON output), and `scan` exits `1` if any are found -- so this doubles as a CI gate. A clean policy check exits `0`.
+
+Note: a policy check is only as trustworthy as the underlying result's `confidence`. A violation on an `unsupported` result means the role stand-in used for this run happened to be allowed -- it isn't a guarantee about every user with that role, since the condition itself wasn't fully analyzed. Treat those as "investigate," not "confirmed."
 
 ## Security
 
