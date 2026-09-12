@@ -30,8 +30,20 @@ Metrics/ParameterLists:
 # ceremony for a library this size. The line count is from method *count*,
 # not any one method being complex -- see the (comfortably-under-default)
 # Metrics/* complexity cops, which this class passes cleanly.
+#
+# HtmlReport's inlined HTML/CSS/JS report template is a heredoc constant --
+# it's the report's markup, not the class's structural complexity, so it
+# counts as a single line here rather than its literal line count. Same
+# heredoc also nests inside `module RubyAbilityGraph`, so ModuleLength needs
+# the same treatment.
 Metrics/ClassLength:
   Max: 165
+  CountAsOne:
+    - heredoc
+
+Metrics/ModuleLength:
+  CountAsOne:
+    - heredoc
 
 # RSpec.describe blocks routinely run long once a fixture covers several
 # scenarios -- that's example count, not complexity.

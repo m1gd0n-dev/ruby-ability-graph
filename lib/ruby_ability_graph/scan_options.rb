@@ -35,6 +35,7 @@ module RubyAbilityGraph
         add_ruby_bin_option!(opts, options)
         add_format_option!(opts, options)
         add_policy_file_option!(opts, options)
+        add_html_report_option!(opts, options)
         add_loader_strategy_options!(opts, options)
       end
     end
@@ -69,6 +70,13 @@ module RubyAbilityGraph
       opts.on("--policy-file FILE", "YAML file declaring role/action/model access expectations " \
                                     "(see README); violations are flagged and exit non-zero") do |v|
         options[:policy_file] = v
+      end
+    end
+
+    def add_html_report_option!(opts, options)
+      opts.on("--html-report FILE", "Write a self-contained, interactive HTML graph of the results " \
+                                    "(see README) to this path, relative to APP_PATH") do |v|
+        options[:html_report] = v
       end
     end
 

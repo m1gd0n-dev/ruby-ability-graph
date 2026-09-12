@@ -12,6 +12,7 @@ module RubyAbilityGraph
       Usage: ruby-ability-graph scan APP_PATH [--roles-file FILE] [--ability-file FILE]
                                                [--require FILE]... | [--rails-boot [--rails-env ENV]]
                                                [--ruby-bin PATH] [--format table|json] [--policy-file FILE]
+                                               [--html-report FILE]
              ruby-ability-graph inspect APP_PATH [--ability-file FILE]
     USAGE
 
@@ -35,6 +36,11 @@ module RubyAbilityGraph
       roles = load_roles(options[:roles_file], app_path)
       results = RubyAbilityGraph::Harness.new(**harness_kwargs(options, app_path, roles)).run
       violations = load_policy_violations(options[:policy_file], app_path, results)
+      output_results(options, app_path, results, violations)
+    end
+
+    def output_results(options, app_path, results, violations)
+      write_html_report(options[:html_report], app_path, results, violations)
 
       presenter = RubyAbilityGraph::ScanPresenter.new(
         format: options[:format], results: results, violations: violations
@@ -66,6 +72,16 @@ module RubyAbilityGraph
 
       policies = YAML.safe_load_file(path)["policies"] || []
       RubyAbilityGraph::PolicyChecker.call(policies: policies, results: results)
+    end
+
+    # Written to stderr, not stdout -- keeps `--format json` pipeable without
+    # this confirmation line landing in the middle of the JSON payload.
+    def write_html_report(html_report, app_path, results, violations)
+      return unless html_report
+
+      path = File.expand_path(html_report, app_path)
+      File.write(path, RubyAbilityGraph::HtmlReport.call(results: results, violations: violations))
+      warn "HTML report written to #{path}"
     end
 
     def inspect_ability(argv)

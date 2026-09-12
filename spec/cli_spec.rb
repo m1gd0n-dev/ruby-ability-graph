@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "tmpdir"
+
 RSpec.describe RubyAbilityGraph::CLI do
   let(:app_path) { fixture_path("toy_app") }
 
@@ -39,6 +41,21 @@ RSpec.describe RubyAbilityGraph::CLI do
     expect do
       described_class.start(["scan", app_path, "--format", "yaml"])
     end.to raise_error(OptionParser::InvalidArgument)
+  end
+
+  context "with --html-report" do
+    it "writes a self-contained HTML report and confirms the path on stderr, not stdout" do
+      Dir.mktmpdir do |dir|
+        report_path = File.join(dir, "report.html")
+
+        expect do
+          described_class.start(["scan", app_path, "--html-report", report_path])
+        end.to output(/resolved \(/).to_stdout
+           .and output(/HTML report written to #{Regexp.escape(report_path)}/).to_stderr
+
+        expect(File.read(report_path)).to start_with("<!doctype html>")
+      end
+    end
   end
 
   context "with --policy-file" do
