@@ -19,70 +19,10 @@ module RubyAbilityGraph
   class HtmlReport
     DATA_PLACEHOLDER = "/*__RUBY_ABILITY_GRAPH_DATA__*/"
 
-    def self.call(results:, violations: nil)
-      new(results: results, violations: violations).call
-    end
-
-    def initialize(results:, violations: nil)
-      @results = results
-      @violations = violations
-    end
-
-    def call
-      # Block form, not TEMPLATE.sub(DATA_PLACEHOLDER, embedded_json) -- a String
-      # replacement argument gets backreference processing (\1, \&, ...), which
-      # would silently mangle JSON containing backslashes (e.g. our own "<\/"
-      # escaping below, or a condition value with a literal backslash in it).
-      # The block form inserts its return value verbatim.
-      TEMPLATE.sub(DATA_PLACEHOLDER) { embedded_json }
-    end
-
-    private
-
-    # Escape "</" so a condition value containing a literal "</script>"
-    # can't break out of the inline <script> block it's embedded in.
-    def embedded_json
-      data.to_json.gsub("</", '<\/')
-    end
-
-    def data
-      { "rows" => allowed_rows, "coverage" => coverage, "violationCount" => @violations&.size }
-    end
-
-    # Only allowed=true rows are graph-worthy -- this is a "who can access
-    # what" diagram, not a dump of every denial.
-    def allowed_rows
-      violated = violated_triples
-      @results.select { |r| r["allowed"] }.map do |r|
-        {
-          "role" => r["role"], "action" => r["action"], "model" => r["model"],
-          "confidence" => r["confidence"], "condition" => r["condition"], "reasons" => r["reasons"] || [],
-          "violation" => violated.include?([r["role"], r["action"], r["model"]])
-        }
-      end
-    end
-
-    def violated_triples
-      (@violations || []).map { |v| [v["role"], v["action"], v["model"]] }.to_set
-    end
-
-    def coverage
-      resolved = @results.count { |r| r["confidence"] == "resolved" }
-      total = @results.size
-      { "resolved" => resolved, "total" => total, "pct" => coverage_pct(resolved, total) }
-    end
-
-    def coverage_pct(resolved, total)
-      return 0 if total.zero?
-
-      ((resolved.to_f / total) * 100).round(1)
-    end
-
-    # The quoted delimiter isn't about interpolation -- there's no Ruby
-    # interpolation syntax anywhere below. It's what stops Ruby from
+    # The quoted heredoc delimiter isn't about interpolation -- there's no
+    # Ruby interpolation syntax anywhere below. It's what stops Ruby from
     # interpreting the embedded JS's own backslash escape sequences as if
     # they were Ruby's own string escapes.
-    # rubocop:disable Style/RedundantHeredocDelimiterQuotes
     TEMPLATE = <<~'HTML'
       <!doctype html>
       <html lang="en">
@@ -198,6 +138,12 @@ module RubyAbilityGraph
           "use strict";
           var DATA = /*__RUBY_ABILITY_GRAPH_DATA__*/;
           var SVGNS = "http://www.w3.org/2000/svg";
+          // A control character, not a display separator -- joins role/action/model
+          // names into map keys so a name that happens to contain a plain space
+          // can't collide with a different (role, action) or (action, model) pair.
+          // Built at runtime (not written as a literal escape) so it stays a plain
+          // JS string, unambiguous from Ruby's own escape handling of this template.
+          var SEP = String.fromCharCode(0);
           var ROW_HEIGHT = 28;
           var WIDTH = 960;
           var MARGIN = 110;
@@ -277,12 +223,12 @@ module RubyAbilityGraph
 
             var raEdges = groupBy(
               rows,
-              function (r) { return r.role + "\u0000" + r.action; },
+              function (r) { return r.role + SEP + r.action; },
               function (r) { return { role: r.role, action: r.action, rows: [] }; }
             );
             var amEdges = groupBy(
               rows,
-              function (r) { return r.action + "\u0000" + r.model; },
+              function (r) { return r.action + SEP + r.model; },
               function (r) { return { action: r.action, model: r.model, rows: [] }; }
             );
             var raByRole = byField(raEdges, "role"), raByAction = byField(raEdges, "action");
@@ -290,7 +236,7 @@ module RubyAbilityGraph
 
             var elements = { role: {}, action: {}, model: {}, ra: {}, am: {} };
 
-            function edgeKey(edge, a, b) { return edge[a] + "\u0000" + edge[b]; }
+            function edgeKey(edge, a, b) { return edge[a] + SEP + edge[b]; }
 
             function drawEdge(x1, y1, x2, y2, statusRows, store, key) {
               var midX = (x1 + x2) / 2;
@@ -443,6 +389,64 @@ module RubyAbilityGraph
       </body>
       </html>
     HTML
-    # rubocop:enable Style/RedundantHeredocDelimiterQuotes
+
+    def self.call(results:, violations: nil)
+      new(results: results, violations: violations).call
+    end
+
+    def initialize(results:, violations: nil)
+      @results = results
+      @violations = violations
+    end
+
+    def call
+      # Block form, not TEMPLATE.sub(DATA_PLACEHOLDER, embedded_json) -- a String
+      # replacement argument gets backreference processing (\1, \&, ...), which
+      # would silently mangle JSON containing backslashes (e.g. our own "<\/"
+      # escaping below, or a condition value with a literal backslash in it).
+      # The block form inserts its return value verbatim.
+      TEMPLATE.sub(DATA_PLACEHOLDER) { embedded_json }
+    end
+
+    private
+
+    # Escape "</" so a condition value containing a literal "</script>"
+    # can't break out of the inline <script> block it's embedded in.
+    def embedded_json
+      data.to_json.gsub("</", '<\/')
+    end
+
+    def data
+      { "rows" => allowed_rows, "coverage" => coverage, "violationCount" => @violations&.size }
+    end
+
+    # Only allowed=true rows are graph-worthy -- this is a "who can access
+    # what" diagram, not a dump of every denial.
+    def allowed_rows
+      violated = violated_triples
+      @results.select { |r| r["allowed"] }.map do |r|
+        {
+          "role" => r["role"], "action" => r["action"], "model" => r["model"],
+          "confidence" => r["confidence"], "condition" => r["condition"], "reasons" => r["reasons"] || [],
+          "violation" => violated.include?([r["role"], r["action"], r["model"]])
+        }
+      end
+    end
+
+    def violated_triples
+      (@violations || []).to_set { |v| [v["role"], v["action"], v["model"]] }
+    end
+
+    def coverage
+      resolved = @results.count { |r| r["confidence"] == "resolved" }
+      total = @results.size
+      { "resolved" => resolved, "total" => total, "pct" => coverage_pct(resolved, total) }
+    end
+
+    def coverage_pct(resolved, total)
+      return 0 if total.zero?
+
+      ((resolved.to_f / total) * 100).round(1)
+    end
   end
 end

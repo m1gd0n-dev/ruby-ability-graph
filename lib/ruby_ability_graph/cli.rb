@@ -36,6 +36,10 @@ module RubyAbilityGraph
       roles = load_roles(options[:roles_file], app_path)
       results = RubyAbilityGraph::Harness.new(**harness_kwargs(options, app_path, roles)).run
       violations = load_policy_violations(options[:policy_file], app_path, results)
+      output_results(options, app_path, results, violations)
+    end
+
+    def output_results(options, app_path, results, violations)
       write_html_report(options[:html_report], app_path, results, violations)
 
       presenter = RubyAbilityGraph::ScanPresenter.new(
