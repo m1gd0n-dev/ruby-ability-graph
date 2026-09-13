@@ -18,7 +18,14 @@ module RubyAbilityGraph
     end
 
     def call
-      return unsupported("block_condition") if @rule.block
+      # only_block?, not @rule.block -- cancancan only made `block` a public
+      # reader from ~3.x on (it's a private ivar in, e.g., 1.17.0, still
+      # bundled by real apps -- found via dogfooding dradis-ce). only_block?
+      # (conditions_empty? && block-present) is public across both and, since
+      # both versions treat a Hash-conditions-plus-block combo as a raise-on-
+      # declaration error, it's equivalent to "has a block" for every rule
+      # that could actually exist.
+      return unsupported("block_condition") if @rule.only_block?
 
       conditions = @rule.conditions
       return resolved(nil) if blank?(conditions)

@@ -21,7 +21,7 @@ Requires Ruby >= 4.0.
 `inspect` statically scans `Ability#initialize` (via [Prism](https://github.com/ruby/prism), without executing your app) and lists every method it calls on `user`:
 
 ```
-ruby-ability-graph inspect APP_PATH [--ability-file FILE]
+ruby-ability-graph inspect APP_PATH [--ability-file FILE] [--ability-class NAME]
 ```
 
 ```
@@ -47,7 +47,7 @@ member:
 ### 3. Scan
 
 ```
-ruby-ability-graph scan APP_PATH [--roles-file FILE] [--ability-file FILE]
+ruby-ability-graph scan APP_PATH [--roles-file FILE] [--ability-file FILE] [--ability-class NAME]
                                   [--require FILE]... | [--rails-boot [--rails-env ENV]]
                                   [--ruby-bin PATH] [--format table|json] [--policy-file FILE]
                                   [--html-report FILE]
@@ -89,12 +89,15 @@ Pass `--format json` for the same data as structured, versioned JSON instead:
 |---|---|---|
 | `--roles-file FILE` | `APP_PATH/.ability_graph_roles.yml` | YAML file from step 2 |
 | `--ability-file FILE` | `app/models/ability.rb` | Path to the `Ability` class, relative to `APP_PATH` |
+| `--ability-class NAME` | `Ability` | Constant name to load, e.g. `Spree::Ability` for a namespaced/engine-provided one |
 | `--require FILE` (repeatable) | -- | Preload a file your `Ability` class references but doesn't require itself. Not compatible with `--rails-boot` |
 | `--rails-boot [--rails-env ENV]` | off / `test` | Boot via the target's own `bin/rails runner` so real Zeitwerk autoloading resolves everything -- no manual `--require` list needed. Not compatible with `--require` |
 | `--ruby-bin PATH` | `ruby` (via `PATH`) | Ruby executable for the analysis subprocess, if the target app needs a different Ruby version than this gem runs under |
 | `--format table\|json` | `table` | `table` for a terminal-friendly summary, `json` for the versioned schema above |
 | `--policy-file FILE` | -- | Run a policy check against the results (see below); path is relative to `APP_PATH` |
 | `--html-report FILE` | -- | Write an interactive HTML graph of the results (see below) to this path, relative to `APP_PATH` |
+
+Note: `--rails-boot` runs the target's *entire* boot sequence, not just the `Ability` class -- if the app needs a JS runtime, a live DB connection, or anything else at boot time (not merely at asset-compile time), that has to already be satisfied in whatever environment you're running the scan from. This is most likely to bite in a stripped-down CI container or sandbox rather than a normal dev machine. If the target's full boot is heavy or fragile, `--require`ing just what the `Ability` class needs is usually simpler than fighting its boot process.
 
 ### 4. Policy checks (optional)
 

@@ -10,10 +10,11 @@ module RubyAbilityGraph
   class CLI
     USAGE = <<~USAGE.chomp
       Usage: ruby-ability-graph scan APP_PATH [--roles-file FILE] [--ability-file FILE]
+                                               [--ability-class NAME]
                                                [--require FILE]... | [--rails-boot [--rails-env ENV]]
                                                [--ruby-bin PATH] [--format table|json] [--policy-file FILE]
                                                [--html-report FILE]
-             ruby-ability-graph inspect APP_PATH [--ability-file FILE]
+             ruby-ability-graph inspect APP_PATH [--ability-file FILE] [--ability-class NAME]
     USAGE
 
     def self.start(argv)
@@ -49,17 +50,16 @@ module RubyAbilityGraph
       exit(1) if presenter.violations?
     end
 
+    # rails_env/ruby_bin are only included when set at all, so Harness's own
+    # keyword defaults apply otherwise -- an explicit nil would override
+    # them instead. #compact drops both when absent (rails_boot: false is a
+    # real value, not "absent", so it survives).
     def harness_kwargs(options, app_path, roles)
-      kwargs = {
-        app_path: app_path,
-        roles: roles,
-        ability_file: options[:ability_file],
-        requires: options[:requires],
-        rails_boot: options[:rails_boot]
-      }
-      kwargs[:rails_env] = options[:rails_env] if options[:rails_env]
-      kwargs[:ruby_bin] = options[:ruby_bin] if options[:ruby_bin]
-      kwargs
+      {
+        app_path: app_path, roles: roles, ability_file: options[:ability_file],
+        ability_class_name: options[:ability_class], requires: options[:requires],
+        rails_boot: options[:rails_boot], rails_env: options[:rails_env], ruby_bin: options[:ruby_bin]
+      }.compact
     end
 
     # nil (not merely empty) means "no --policy-file given" -- ScanPresenter
@@ -85,33 +85,50 @@ module RubyAbilityGraph
     end
 
     def inspect_ability(argv)
-      app_path, ability_file = parse_inspect_args(argv)
-      inspector = RubyAbilityGraph::Inspector.new(ability_file: File.expand_path(ability_file, app_path))
+      app_path, options = parse_inspect_args(argv)
+      inspector = build_inspector(options, app_path)
+      result = run_inspector(inspector)
+      print_inspection_result(result, options[:ability_class])
+    end
 
-      result = begin
-        inspector.call
-      rescue RubyAbilityGraph::Inspector::InspectionError => e
-        abort(e.message)
-      end
+    def build_inspector(options, app_path)
+      RubyAbilityGraph::Inspector.new(
+        ability_file: File.expand_path(options[:ability_file], app_path),
+        ability_class_name: options[:ability_class]
+      )
+    end
 
-      print_inspection_result(result)
+    def run_inspector(inspector)
+      inspector.call
+    rescue RubyAbilityGraph::Inspector::InspectionError => e
+      abort(e.message)
     end
 
     def parse_inspect_args(argv)
-      options = { ability_file: RubyAbilityGraph::Harness::DEFAULT_ABILITY_FILE }
+      options = { ability_file: RubyAbilityGraph::Harness::DEFAULT_ABILITY_FILE, ability_class: "Ability" }
+      build_inspect_parser(options).parse!(argv)
+
+      app_path = argv.shift
+      abort(USAGE) unless app_path
+      [app_path, options]
+    end
+
+    ABILITY_CLASS_HELP = "The class name exactly as written at its `class` statement in that file -- " \
+                         "usually just Ability even when it's namespaced (e.g. `module Spree; class " \
+                         "Ability`), unless it's written inline as `class Spree::Ability` (default: Ability)"
+    private_constant :ABILITY_CLASS_HELP
+
+    def build_inspect_parser(options)
       OptionParser.new do |opts|
         opts.on("--ability-file FILE", "Path to the Ability class file, relative to APP_PATH") do |v|
           options[:ability_file] = v
         end
-      end.parse!(argv)
-
-      app_path = argv.shift
-      abort(USAGE) unless app_path
-      [app_path, options[:ability_file]]
+        opts.on("--ability-class NAME", ABILITY_CLASS_HELP) { |v| options[:ability_class] = v }
+      end
     end
 
-    def print_inspection_result(result)
-      puts "Methods called on `user` in Ability#initialize:"
+    def print_inspection_result(result, ability_class)
+      puts "Methods called on `user` in #{ability_class}#initialize:"
       result.method_names.each { |m| puts "  #{m}" }
       puts
       puts "Your roles file needs a value for each, per role that reaches it."

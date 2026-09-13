@@ -150,6 +150,20 @@ RSpec.describe RubyAbilityGraph::Harness, "against a target with its own Gemfile
   end
 end
 
+RSpec.describe RubyAbilityGraph::Harness, "with a namespaced ability_class_name: (e.g. an engine's Spree::Ability)" do
+  let(:app_path) { fixture_path("namespaced_ability_app") }
+  let(:roles) { roles_for(app_path) }
+
+  it "resolves the class via Object.const_get's built-in support for dotted constant paths" do
+    harness = described_class.new(app_path: app_path, roles: roles, ability_class_name: "Spree::Ability")
+    results = harness.run
+
+    expect(results).not_to be_empty
+    expect(result_for(results, role: "member", action: "read", model: "Document")["allowed"]).to be true
+    expect(result_for(results, role: "member", action: "update", model: "Document")["condition"]).to eq("user_id" => 1)
+  end
+end
+
 RSpec.describe RubyAbilityGraph::Harness, "with rails_boot: (#3)" do
   let(:app_path) { fixture_path("rails_shaped_app") }
   let(:roles) { roles_for(app_path) }
