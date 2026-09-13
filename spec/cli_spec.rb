@@ -43,6 +43,16 @@ RSpec.describe RubyAbilityGraph::CLI do
     end.to raise_error(OptionParser::InvalidArgument)
   end
 
+  context "with --ability-class" do
+    it "resolves a namespaced Ability class (e.g. an engine's Spree::Ability)" do
+      namespaced_app_path = fixture_path("namespaced_ability_app")
+
+      expect do
+        described_class.start(["scan", namespaced_app_path, "--ability-class", "Spree::Ability"])
+      end.to output(/member\s+read\s+Document\s+true/).to_stdout
+    end
+  end
+
   context "with --html-report" do
     it "writes a self-contained HTML report and confirms the path on stderr, not stdout" do
       Dir.mktmpdir do |dir|

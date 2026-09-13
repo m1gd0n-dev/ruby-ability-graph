@@ -25,13 +25,17 @@ module RubyAbilityGraph
     private
 
     def defaults
-      { ability_file: Harness::DEFAULT_ABILITY_FILE, requires: [], rails_boot: false, format: "table" }
+      {
+        ability_file: Harness::DEFAULT_ABILITY_FILE, ability_class: "Ability",
+        requires: [], rails_boot: false, format: "table"
+      }
     end
 
     def build_parser(options)
       OptionParser.new do |opts|
         add_roles_file_option!(opts, options)
         add_ability_file_option!(opts, options)
+        add_ability_class_option!(opts, options)
         add_ruby_bin_option!(opts, options)
         add_format_option!(opts, options)
         add_policy_file_option!(opts, options)
@@ -49,6 +53,13 @@ module RubyAbilityGraph
     def add_ability_file_option!(opts, options)
       opts.on("--ability-file FILE", "Path to the Ability class file, relative to APP_PATH") do |v|
         options[:ability_file] = v
+      end
+    end
+
+    def add_ability_class_option!(opts, options)
+      opts.on("--ability-class NAME", "Constant name of the Ability class, e.g. Spree::Ability for a " \
+                                       "namespaced/engine-provided one (default: Ability)") do |v|
+        options[:ability_class] = v
       end
     end
 

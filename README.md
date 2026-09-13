@@ -21,7 +21,7 @@ Requires Ruby >= 4.0.
 `inspect` statically scans `Ability#initialize` (via [Prism](https://github.com/ruby/prism), without executing your app) and lists every method it calls on `user`:
 
 ```
-ruby-ability-graph inspect APP_PATH [--ability-file FILE]
+ruby-ability-graph inspect APP_PATH [--ability-file FILE] [--ability-class NAME]
 ```
 
 ```
@@ -47,7 +47,7 @@ member:
 ### 3. Scan
 
 ```
-ruby-ability-graph scan APP_PATH [--roles-file FILE] [--ability-file FILE]
+ruby-ability-graph scan APP_PATH [--roles-file FILE] [--ability-file FILE] [--ability-class NAME]
                                   [--require FILE]... | [--rails-boot [--rails-env ENV]]
                                   [--ruby-bin PATH] [--format table|json] [--policy-file FILE]
                                   [--html-report FILE]
@@ -89,6 +89,7 @@ Pass `--format json` for the same data as structured, versioned JSON instead:
 |---|---|---|
 | `--roles-file FILE` | `APP_PATH/.ability_graph_roles.yml` | YAML file from step 2 |
 | `--ability-file FILE` | `app/models/ability.rb` | Path to the `Ability` class, relative to `APP_PATH` |
+| `--ability-class NAME` | `Ability` | Constant name to load, e.g. `Spree::Ability` for a namespaced/engine-provided one |
 | `--require FILE` (repeatable) | -- | Preload a file your `Ability` class references but doesn't require itself. Not compatible with `--rails-boot` |
 | `--rails-boot [--rails-env ENV]` | off / `test` | Boot via the target's own `bin/rails runner` so real Zeitwerk autoloading resolves everything -- no manual `--require` list needed. Not compatible with `--require` |
 | `--ruby-bin PATH` | `ruby` (via `PATH`) | Ruby executable for the analysis subprocess, if the target app needs a different Ruby version than this gem runs under |

@@ -10,10 +10,11 @@ module RubyAbilityGraph
   class CLI
     USAGE = <<~USAGE.chomp
       Usage: ruby-ability-graph scan APP_PATH [--roles-file FILE] [--ability-file FILE]
+                                               [--ability-class NAME]
                                                [--require FILE]... | [--rails-boot [--rails-env ENV]]
                                                [--ruby-bin PATH] [--format table|json] [--policy-file FILE]
                                                [--html-report FILE]
-             ruby-ability-graph inspect APP_PATH [--ability-file FILE]
+             ruby-ability-graph inspect APP_PATH [--ability-file FILE] [--ability-class NAME]
     USAGE
 
     def self.start(argv)
@@ -54,6 +55,7 @@ module RubyAbilityGraph
         app_path: app_path,
         roles: roles,
         ability_file: options[:ability_file],
+        ability_class_name: options[:ability_class],
         requires: options[:requires],
         rails_boot: options[:rails_boot]
       }
@@ -85,8 +87,11 @@ module RubyAbilityGraph
     end
 
     def inspect_ability(argv)
-      app_path, ability_file = parse_inspect_args(argv)
-      inspector = RubyAbilityGraph::Inspector.new(ability_file: File.expand_path(ability_file, app_path))
+      app_path, options = parse_inspect_args(argv)
+      inspector = RubyAbilityGraph::Inspector.new(
+        ability_file: File.expand_path(options[:ability_file], app_path),
+        ability_class_name: options[:ability_class]
+      )
 
       result = begin
         inspector.call
@@ -94,24 +99,30 @@ module RubyAbilityGraph
         abort(e.message)
       end
 
-      print_inspection_result(result)
+      print_inspection_result(result, options[:ability_class])
     end
 
     def parse_inspect_args(argv)
-      options = { ability_file: RubyAbilityGraph::Harness::DEFAULT_ABILITY_FILE }
+      options = { ability_file: RubyAbilityGraph::Harness::DEFAULT_ABILITY_FILE, ability_class: "Ability" }
       OptionParser.new do |opts|
         opts.on("--ability-file FILE", "Path to the Ability class file, relative to APP_PATH") do |v|
           options[:ability_file] = v
+        end
+        opts.on("--ability-class NAME", "The class name exactly as written at its `class` statement in that " \
+                                         "file -- usually just Ability even when it's namespaced (e.g. " \
+                                         "`module Spree; class Ability`), unless it's written inline as " \
+                                         "`class Spree::Ability` (default: Ability)") do |v|
+          options[:ability_class] = v
         end
       end.parse!(argv)
 
       app_path = argv.shift
       abort(USAGE) unless app_path
-      [app_path, options[:ability_file]]
+      [app_path, options]
     end
 
-    def print_inspection_result(result)
-      puts "Methods called on `user` in Ability#initialize:"
+    def print_inspection_result(result, ability_class)
+      puts "Methods called on `user` in #{ability_class}#initialize:"
       result.method_names.each { |m| puts "  #{m}" }
       puts
       puts "Your roles file needs a value for each, per role that reaches it."
