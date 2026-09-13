@@ -58,7 +58,7 @@ module RubyAbilityGraph
 
     def add_ability_class_option!(opts, options)
       opts.on("--ability-class NAME", "Constant name of the Ability class, e.g. Spree::Ability for a " \
-                                       "namespaced/engine-provided one (default: Ability)") do |v|
+                                      "namespaced/engine-provided one (default: Ability)") do |v|
         options[:ability_class] = v
       end
     end

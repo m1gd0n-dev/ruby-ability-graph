@@ -139,7 +139,7 @@ end
 class TestAbilityWithPermissionSet
   include CanCan::Ability
 
-  def initialize(user)
+  def initialize(_user)
     TestDefaultCustomerPermissionSet.new(self).activate!
   end
 end
