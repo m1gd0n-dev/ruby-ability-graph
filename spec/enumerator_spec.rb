@@ -107,6 +107,43 @@ class TestAbilityWithDiamondMerge
   end
 end
 
+# Real-world pattern found dogfooding solidus: authorization split into a
+# framework "permission set" class whose own `can`/`cannot` method just
+# forwards to the actual Ability (Solidus does this via
+# `delegate :can, :cannot, :user, to: :ability`). A forwarding method
+# defined this way is its own stack frame sitting between the real
+# declaration site and cancancan's own add_rule -- naively taking the first
+# non-cancancan frame collapses every rule declared this way to the single
+# line where the forwarding method itself is defined, not each rule's own
+# distinct source.
+class TestPermissionSetBase
+  def initialize(ability)
+    @ability = ability
+  end
+
+  def can(...)
+    @ability.can(...)
+  end
+
+  def cannot(...)
+    @ability.cannot(...)
+  end
+end
+
+class TestDefaultCustomerPermissionSet < TestPermissionSetBase
+  def activate!
+    can(:update, TestDocument) { |doc| doc == :nope }
+  end
+end
+
+class TestAbilityWithPermissionSet
+  include CanCan::Ability
+
+  def initialize(user)
+    TestDefaultCustomerPermissionSet.new(self).activate!
+  end
+end
+
 def test_role_stand_ins
   {
     "admin" => RubyAbilityGraph::RoleStandIn.new(admin?: true),
@@ -199,6 +236,15 @@ RSpec.describe RubyAbilityGraph::Enumerator do
     expect(result.confidence).to eq("unsupported")
     expect(result.sources.first["text"]).to include("can(:update")
     expect(result.sources.first["text"]).not_to include("merge")
+  end
+
+  it "attributes a rule declared through a can/cannot-forwarding method to its real call site" do
+    stand_ins = { "member" => RubyAbilityGraph::RoleStandIn.new }
+    scoped_results = described_class.call(ability_class: TestAbilityWithPermissionSet, role_stand_ins: stand_ins)
+    result = struct_result_for(scoped_results, role: "member", action: "update", model: "TestDocument")
+    expect(result.confidence).to eq("unsupported")
+    expect(result.sources.first["text"]).to include("can(:update")
+    expect(result.sources.first["text"]).not_to include("def can")
   end
 
   it "does not mistake the same rule reached via two merge paths (a diamond) for a loop" do

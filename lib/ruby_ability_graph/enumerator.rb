@@ -30,9 +30,32 @@ module RubyAbilityGraph
     # sighting) rather than in an array indexed by position, so it survives
     # being re-added to another ability's own @rules during merge.
     module RuleSourceRecording
+      # Larger apps commonly split `can`/`cannot` declarations out of Ability
+      # itself via a plain forwarding method -- Solidus's whole
+      # PermissionSets framework works this way (`delegate :can, :cannot,
+      # :user, to: :ability` in every permission set's base class, found
+      # dogfooding solidus). A delegate-generated method's OWN recorded
+      # file/line is wherever `delegate :can, ...` itself was written, not
+      # the permission set subclass that actually calls it -- so the first
+      # non-cancancan frame there is a dead end, and every rule declared
+      # through that same delegate line collapses to one identical,
+      # unhelpful source pointer. Skipping frames whose method name is
+      # itself can/cannot (regardless of whether the forwarding was done via
+      # `delegate`, `alias`, or a hand-written wrapper) walks past that and
+      # lands on the real call site instead.
+      #
+      # Location#label isn't just the bare method name -- on this Ruby
+      # version it's qualified as "PermBase#can" (confirmed empirically;
+      # comparing against a bare "can"/"cannot" silently never matched and
+      # let the very bug this is meant to fix through). Match on either form.
+      FORWARDING_METHOD_NAME = /(\A|#)(can|cannot)\z/
+
       def add_rule(rule)
         unless rule.instance_variable_defined?(:@rag_source)
-          rule.instance_variable_set(:@rag_source, caller_locations.find { |loc| !loc.path.include?("cancancan") })
+          location = caller_locations.find do |loc|
+            !loc.path.include?("cancancan") && !FORWARDING_METHOD_NAME.match?(loc.label)
+          end
+          rule.instance_variable_set(:@rag_source, location)
         end
         super
       end
