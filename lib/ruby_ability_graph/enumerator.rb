@@ -115,12 +115,25 @@ module RubyAbilityGraph
     # static duplication, not a loop, and shouldn't taint an otherwise
     # perfectly resolvable rule.
     def dynamic_rule_set(rules)
-      rules.group_by { |rule| rule_source(rule) }
-           .reject { |location, _| location.nil? }
+      rules.group_by { |rule| location_key(rule_source(rule)) }
+           .reject { |key, _| key.nil? }
            .values
            .select { |group| group.size > 1 && varies?(group) }
            .flatten
            .to_set
+    end
+
+    # Thread::Backtrace::Location has no value equality of its own -- two
+    # separate calls to caller_locations, even for the exact same physical
+    # line, return objects that are neither `==` nor `eql?` to each other
+    # (confirmed empirically). Grouping by the raw Location silently never
+    # merged anything, so this whole dynamic-vs-static check was a no-op
+    # from the moment it shipped. [path, lineno] is a plain, hashable-by-
+    # value key that actually collapses same-site rules.
+    def location_key(location)
+      return nil unless location
+
+      [location.path, location.lineno]
     end
 
     def varies?(group)
