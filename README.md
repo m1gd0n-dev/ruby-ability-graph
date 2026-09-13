@@ -96,6 +96,8 @@ Pass `--format json` for the same data as structured, versioned JSON instead:
 | `--policy-file FILE` | -- | Run a policy check against the results (see below); path is relative to `APP_PATH` |
 | `--html-report FILE` | -- | Write an interactive HTML graph of the results (see below) to this path, relative to `APP_PATH` |
 
+Note: `--rails-boot` runs the target's *entire* boot sequence, not just the `Ability` class -- if the app needs a JS runtime, a live DB connection, or anything else at boot time (not merely at asset-compile time), that has to already be satisfied in whatever environment you're running the scan from. This is most likely to bite in a stripped-down CI container or sandbox rather than a normal dev machine. If the target's full boot is heavy or fragile, `--require`ing just what the `Ability` class needs is usually simpler than fighting its boot process.
+
 ### 4. Policy checks (optional)
 
 Declare who's *supposed* to be able to do what, and let `scan` flag any role that can actually do more. The policy language is deliberately flat -- `model` + `action` + `allowed_roles`, no nested logic:

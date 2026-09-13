@@ -45,6 +45,17 @@ RSpec.describe RubyAbilityGraph::RuleClassifier do
     expect(result.reason).to eq("block_condition")
   end
 
+  it "detects a block via only_block?, not a direct #block reader" do
+    # cancancan only made `block` a public attr_reader from ~3.x on -- it's a
+    # private ivar in older versions (e.g. 1.17.0) still bundled by real apps
+    # (found dogfooding dradis-ce, which crashed with NoMethodError on
+    # @rule.block before this fix). only_block? is public across both.
+    rule = instance_double(CanCan::Rule, only_block?: true)
+    result = classify(rule)
+    expect(result.confidence).to eq("unsupported")
+    expect(result.reason).to eq("block_condition")
+  end
+
   it "flags a nested hash condition as association-chained" do
     rule = rule_for { can :read, ClassifierTestDocument, project: { team_id: 1 } }
     result = classify(rule)
