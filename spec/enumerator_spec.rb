@@ -52,6 +52,61 @@ class TestAbilityWithMultiActionModel
   end
 end
 
+# Real-world pattern found dogfooding consuldemocracy: a top-level Ability
+# composed from smaller ones via `merge`, sometimes several levels deep.
+class TestMergedSub
+  include CanCan::Ability
+
+  def initialize(_user)
+    can(:update, TestDocument) { |doc| doc == :nope }
+  end
+end
+
+class TestAbilityWithMerge
+  include CanCan::Ability
+
+  def initialize(user)
+    merge TestMergedSub.new(user)
+  end
+end
+
+# The same sub-ability reached via two separate merge paths -- a "diamond",
+# also seen in consuldemocracy (a shared sub-ability merged in by more than
+# one branch). This produces two distinct rule *objects* declared at the
+# same source line, which must not be mistaken for a loop-built rule.
+class TestDiamondCommon
+  include CanCan::Ability
+
+  def initialize(_user)
+    can :create, TestReport
+  end
+end
+
+class TestDiamondBranchA
+  include CanCan::Ability
+
+  def initialize(user)
+    merge TestDiamondCommon.new(user)
+  end
+end
+
+class TestDiamondBranchB
+  include CanCan::Ability
+
+  def initialize(user)
+    merge TestDiamondCommon.new(user)
+  end
+end
+
+class TestAbilityWithDiamondMerge
+  include CanCan::Ability
+
+  def initialize(user)
+    merge TestDiamondBranchA.new(user)
+    merge TestDiamondBranchB.new(user)
+  end
+end
+
 def test_role_stand_ins
   {
     "admin" => RubyAbilityGraph::RoleStandIn.new(admin?: true),
@@ -135,5 +190,22 @@ RSpec.describe RubyAbilityGraph::Enumerator do
       result = struct_result_for(results, role: role, action: "read", model: "TestDocument")
       expect(result.reasons).not_to include("dynamic_rule_generation")
     end
+  end
+
+  it "attributes a merged-in rule's source to its real declaration, not the merge call site" do
+    stand_ins = { "member" => RubyAbilityGraph::RoleStandIn.new }
+    scoped_results = described_class.call(ability_class: TestAbilityWithMerge, role_stand_ins: stand_ins)
+    result = struct_result_for(scoped_results, role: "member", action: "update", model: "TestDocument")
+    expect(result.confidence).to eq("unsupported")
+    expect(result.sources.first["text"]).to include("can(:update")
+    expect(result.sources.first["text"]).not_to include("merge")
+  end
+
+  it "does not mistake the same rule reached via two merge paths (a diamond) for a loop" do
+    stand_ins = { "member" => RubyAbilityGraph::RoleStandIn.new }
+    scoped_results = described_class.call(ability_class: TestAbilityWithDiamondMerge, role_stand_ins: stand_ins)
+    result = struct_result_for(scoped_results, role: "member", action: "create", model: "TestReport")
+    expect(result.confidence).to eq("resolved")
+    expect(result.reasons).not_to include("dynamic_rule_generation")
   end
 end

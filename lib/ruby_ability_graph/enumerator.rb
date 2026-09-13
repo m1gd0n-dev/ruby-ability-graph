@@ -13,13 +13,27 @@ module RubyAbilityGraph
     )
     DEFAULT_ACTIONS = %i[index show create update destroy manage read].freeze
 
-    # Records where each rule was declared, by wrapping CanCan::Ability's own
-    # rule-append point. Lets unsupported results point back to source, and
-    # lets us notice the same line firing more than once per instantiation --
-    # a direct signal of loop-built rules.
+    # Records where each rule was truly declared, by wrapping CanCan::Ability's
+    # own rule-append point -- prepended onto the CanCan::Ability MODULE
+    # itself (not a specific Ability class), so it applies uniformly to every
+    # class that includes it. That matters because larger apps commonly split
+    # authorization across several classes merged together (e.g. a top-level
+    # `Ability` doing `merge Abilities::Administrator.new(user)`, itself
+    # merging further sub-abilities -- found dogfooding consuldemocracy).
+    # Prepending only the top-level class would mean a rule declared inside
+    # a merged-in class gets *re-added* during merge, and naive recording
+    # would attribute it to the merge call site, not its real declaration --
+    # every rule sharing that merge line would then look like it fired more
+    # than once, indistinguishable from a genuine loop-built rule.
+    #
+    # The source is stashed directly on the rule object (set once, at first
+    # sighting) rather than in an array indexed by position, so it survives
+    # being re-added to another ability's own @rules during merge.
     module RuleSourceRecording
       def add_rule(rule)
-        (@rag_rule_sources ||= []) << caller_locations.find { |loc| !loc.path.include?("cancancan") }
+        unless rule.instance_variable_defined?(:@rag_source)
+          rule.instance_variable_set(:@rag_source, caller_locations.find { |loc| !loc.path.include?("cancancan") })
+        end
         super
       end
     end
@@ -45,41 +59,54 @@ module RubyAbilityGraph
 
     private
 
-    # No-op if the target's CanCan::Ability doesn't expose #add_rule --
-    # source/dynamic-generation data is simply unavailable then, not fatal.
+    # Prepended onto the CanCan::Ability module -- see RuleSourceRecording --
+    # so this only ever needs to run once, regardless of which Ability-like
+    # class we're pointed at. No-op entirely if the target's cancancan
+    # version doesn't define #add_rule -- source/dynamic-generation data is
+    # simply unavailable then, not fatal.
     def ensure_source_recording!
-      return if @ability_class.ancestors.include?(RuleSourceRecording)
-      return unless @ability_class.method_defined?(:add_rule) || @ability_class.private_method_defined?(:add_rule)
+      return if CanCan::Ability.ancestors.include?(RuleSourceRecording)
+      return unless CanCan::Ability.method_defined?(:add_rule) || CanCan::Ability.private_method_defined?(:add_rule)
 
-      @ability_class.prepend(RuleSourceRecording)
+      CanCan::Ability.prepend(RuleSourceRecording)
     end
 
     def build_results(abilities, models, actions)
       results = []
       abilities.each do |role, ability|
-        rule_sources = ability.instance_variable_get(:@rag_rule_sources) || []
-        dynamic_indices = dynamic_rule_indices(rule_sources)
+        dynamic_rules = dynamic_rule_set(ability.send(:rules))
         models.each do |model|
-          actions.each { |action| results << build_result(role, ability, model, action, rule_sources, dynamic_indices) }
+          actions.each { |action| results << build_result(role, ability, model, action, dynamic_rules) }
         end
       end
       results
     end
 
-    # Indices of rules whose declaration line was hit more than once for
-    # this instantiation -- i.e. built in a loop, not a one-off `can` call.
-    def dynamic_rule_indices(rule_sources)
-      located = rule_sources.each_with_index.reject { |loc, _| loc.nil? }
-      located.group_by { |loc, _| [loc.path, loc.lineno] }
-             .values
-             .select { |group| group.size > 1 }
-             .flat_map { |group| group.map { |_, idx| idx } }
-             .to_set
+    # A rule counts as dynamically generated only if it shares its true
+    # declaration line with at least one OTHER rule from this same
+    # instantiation whose subjects/actions/conditions actually differ -- e.g.
+    # Fat Free CRM's `permissions.each { |p| can :manage, ..., id: p.asset_id }`,
+    # where every iteration produces a different condition. Same line but
+    # every rule otherwise identical is what a merged-in class reached via
+    # more than one path looks like (see RuleSourceRecording) -- that's
+    # static duplication, not a loop, and shouldn't taint an otherwise
+    # perfectly resolvable rule.
+    def dynamic_rule_set(rules)
+      rules.group_by { |rule| rule_source(rule) }
+           .reject { |location, _| location.nil? }
+           .values
+           .select { |group| group.size > 1 && varies?(group) }
+           .flatten
+           .to_set
     end
 
-    def build_result(role, ability, model, action, rule_sources, dynamic_indices)
+    def varies?(group)
+      group.map { |rule| [rule.subjects, rule.actions, rule.conditions] }.uniq.size > 1
+    end
+
+    def build_result(role, ability, model, action, dynamic_rules)
       contributing = relevant_rules(ability, action, model)
-      classifications = contributing.map { |rule, index| classify(rule, model, index, rule_sources, dynamic_indices) }
+      classifications = contributing.map { |rule| classify(rule, model, dynamic_rules) }
 
       Result.new(
         role: role.to_s,
@@ -90,20 +117,20 @@ module RubyAbilityGraph
       )
     end
 
-    def classify(rule, model, index, rule_sources, dynamic_indices)
-      return dynamic_classification(rule_sources, index) if dynamic_indices.include?(index)
+    def classify(rule, model, dynamic_rules)
+      return dynamic_classification(rule) if dynamic_rules.include?(rule)
 
       classification = RuleClassifier.call(rule: rule, model: model)
-      classification.source = source_snippet(rule_sources[index]) if classification.confidence == "unsupported"
+      classification.source = source_snippet(rule_source(rule)) if classification.confidence == "unsupported"
       classification
     end
 
-    def dynamic_classification(rule_sources, index)
+    def dynamic_classification(rule)
       RuleClassifier::Classification.new(
         confidence: "unsupported",
         condition: nil,
         reason: "dynamic_rule_generation",
-        source: source_snippet(rule_sources[index])
+        source: source_snippet(rule_source(rule))
       )
     end
 
@@ -132,16 +159,10 @@ module RubyAbilityGraph
     # of whether their condition currently evaluates true or false -- any one
     # of them being unsupported taints the whole pair (see #verdict).
     def relevant_rules(ability, action, model)
-      rules = ability.send(:rules)
-      candidates = if ability.respond_to?(:relevant_rules, true)
-                     ability.send(:relevant_rules, action, model)
-                   else
-                     rules.select { |r| naive_relevant?(r, action, model) }
-                   end
-
-      candidates.filter_map do |rule|
-        idx = rules.find_index { |r| r.equal?(rule) }
-        idx && [rule, idx]
+      if ability.respond_to?(:relevant_rules, true)
+        ability.send(:relevant_rules, action, model)
+      else
+        ability.send(:rules).select { |r| naive_relevant?(r, action, model) }
       end
     end
 
@@ -150,6 +171,10 @@ module RubyAbilityGraph
     def naive_relevant?(rule, action, model)
       (rule.subjects.include?(model) || rule.subjects.include?(:all)) &&
         (rule.actions.include?(action) || rule.actions.include?(:manage))
+    end
+
+    def rule_source(rule)
+      rule.instance_variable_get(:@rag_source) if rule.instance_variable_defined?(:@rag_source)
     end
 
     def source_snippet(location)
