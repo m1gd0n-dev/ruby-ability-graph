@@ -1,15 +1,32 @@
 # ruby_ability_graph
 
+[![Gem Version](https://img.shields.io/gem/v/ruby_ability_graph)](https://rubygems.org/gems/ruby_ability_graph)
+[![CI](https://github.com/m1gd0n-dev/ruby-ability-graph/actions/workflows/ci.yml/badge.svg)](https://github.com/m1gd0n-dev/ruby-ability-graph/actions/workflows/ci.yml)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE.txt)
+
 Loads a Rails app's [CanCanCan](https://github.com/CanCanCommunity/cancancan) `Ability` class in isolation and reports raw `can?`/`cannot?` results across every role x action x model combination -- so you can see who can access what without booting the full app or hand-tracing every conditional.
 
 **Status:** Each result is classified `resolved` (structured condition captured) or `unsupported` (declared but not analyzed, with a reason and source pointer). `scan` prints a human-readable table by default, a versioned JSON schema on request, can diff results against a simple policy file, and can render an interactive HTML graph of the whole thing.
 
+Dogfooded against 4 real-world open-source Rails apps using CanCanCan:
+
+| App | Resolved |
+|---|---|
+| [Fat Free CRM](https://github.com/fatfreecrm/fat_free_crm) | 88.9% |
+| [Dradis CE](https://github.com/dradis/dradis-ce) | 86.4% |
+| [Consul](https://github.com/consul/consul) | 99.5% |
+| [Solidus](https://github.com/solidusio/solidus) | 96.8% |
+
 ## Installation
 
-Not on RubyGems yet -- point Bundler at the repo instead:
+```
+gem install ruby_ability_graph
+```
+
+Or add it to your Gemfile:
 
 ```ruby
-gem "ruby_ability_graph", github: "m1gd0n-dev/ruby-ability-graph"
+gem "ruby_ability_graph"
 ```
 
 Requires Ruby >= 4.0 and a C compiler to install -- `prism` compiles a native extension at install time. The Rails app you're scanning doesn't need to be on Ruby 4, though -- point `--ruby-bin` at whatever Ruby that app runs on and the analysis subprocess uses that instead.
@@ -137,3 +154,7 @@ Combine it with `--policy-file` to get violations highlighted directly on the gr
 `scan` executes code in `APP_PATH` -- it loads your `Ability` class (and anything that file requires) in a subprocess. Only run it against apps you trust. `inspect` is static analysis only (via Prism) and never executes the target.
 
 `--html-report` makes no network requests, ever -- everything it needs is inlined into the one file it writes. It does embed your role names, action names, model names, and raw condition values into that file, though, so treat the generated report itself with the same care as the scan results: don't publish it somewhere untrusted people can read it if that data is sensitive.
+
+## License
+
+AGPL-3.0-or-later. This is a CLI/library you run against your own `Ability` class as part of your own tooling (CI, local scans) -- it isn't a network service your users interact with, even when that pipeline runs in production. AGPL's network-copyleft clause (§13) is about modifying the program and offering the modified version to outside users over a network; running it, unmodified or modified, to scan your own codebase doesn't do that.
