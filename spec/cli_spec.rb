@@ -92,7 +92,7 @@ RSpec.describe RubyAbilityGraph::CLI do
     it "flags a policy that matches no scan result as unmatched, and exits non-zero" do
       expect do
         described_class.start(["scan", app_path, "--policy-file", "policy_unmatched.yml"])
-      end.to output(/Policy entries with no matching scan result.*Payment \/ read/m).to_stdout
+      end.to output(%r{Policy entries with no matching scan result.*Payment / read}m).to_stdout
          .and raise_error(SystemExit) { |e| expect(e.status).to eq(1) }
     end
 
