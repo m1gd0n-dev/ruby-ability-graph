@@ -55,6 +55,8 @@ module RubyAbilityGraph
       return execute_via_rails_runner(script_path) if @rails_boot
 
       command = bundler_project? ? ["bundle", "exec", @ruby_bin] : [@ruby_bin]
+      # nosemgrep: ruby.lang.security.dangerous-exec.dangerous-exec -- @ruby_bin/@app_path are caller-supplied
+      # tool config, not untrusted remote input; spawning the target app is this harness's intended function.
       Open3.capture3(*command, script_path, chdir: @app_path)
     end
 
@@ -65,6 +67,7 @@ module RubyAbilityGraph
                          "Rails app."
       end
 
+      # nosemgrep: ruby.lang.security.dangerous-exec.dangerous-exec -- same rationale as execute/1 above.
       Open3.capture3({ "RAILS_ENV" => @rails_env }, @ruby_bin, "--", rails_bin, "runner", script_path,
                      chdir: @app_path)
     end
