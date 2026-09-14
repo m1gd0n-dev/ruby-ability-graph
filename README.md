@@ -12,7 +12,7 @@ Not on RubyGems yet -- point Bundler at the repo instead:
 gem "ruby_ability_graph", github: "m1gd0n-dev/ruby-ability-graph"
 ```
 
-Requires Ruby >= 4.0.
+Requires Ruby >= 4.0 and a C compiler to install -- `prism` compiles a native extension at install time. The Rails app you're scanning doesn't need to be on Ruby 4, though -- point `--ruby-bin` at whatever Ruby that app runs on and the analysis subprocess uses that instead.
 
 ## Usage
 
