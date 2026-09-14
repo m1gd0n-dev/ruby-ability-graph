@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-IFS=$'\n\t'
+IFS=$'\n\t' # nosemgrep: bash.lang.security.ifs-tampering.ifs-tampering -- standard "safe bash" idiom; no unquoted expansion of external input below
 
 bundle install
