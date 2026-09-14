@@ -5,3 +5,5 @@
 Gemfile.lock
 .rspec_status
 /security_report/
+.DS_Store
+**/.DS_Store
