@@ -37,10 +37,10 @@ RSpec.describe RubyAbilityGraph::CLI do
     end.to output(/"schema_version": 1.*"results"/m).to_stdout
   end
 
-  it "rejects an unrecognized --format value" do
+  it "rejects an unrecognized --format value with a clean error, not a raw backtrace" do
     expect do
       described_class.start(["scan", app_path, "--format", "yaml"])
-    end.to raise_error(OptionParser::InvalidArgument)
+    end.to output(/invalid argument.*--format/).to_stderr.and raise_error(SystemExit)
   end
 
   context "with --ability-class" do
@@ -87,6 +87,25 @@ RSpec.describe RubyAbilityGraph::CLI do
       expect do
         described_class.start(["scan", app_path, "--policy-file", "policy_violation.yml", "--format", "json"])
       end.to output(/"policy_violations"/).to_stdout.and raise_error(SystemExit)
+    end
+
+    it "flags a policy that matches no scan result as unmatched, and exits non-zero" do
+      expect do
+        described_class.start(["scan", app_path, "--policy-file", "policy_unmatched.yml"])
+      end.to output(/Policy entries with no matching scan result.*Payment \/ read/m).to_stdout
+         .and raise_error(SystemExit) { |e| expect(e.status).to eq(1) }
+    end
+
+    it "aborts with a clear message on malformed policy YAML, not a raw backtrace" do
+      expect do
+        described_class.start(["scan", app_path, "--policy-file", "policy_malformed.yml"])
+      end.to output(/Failed to parse policy file/).to_stderr.and raise_error(SystemExit)
+    end
+
+    it "aborts with a clear message when the policy file's top level isn't a mapping" do
+      expect do
+        described_class.start(["scan", app_path, "--policy-file", "policy_not_a_hash.yml"])
+      end.to output(/must be a YAML mapping/).to_stderr.and raise_error(SystemExit)
     end
   end
 end

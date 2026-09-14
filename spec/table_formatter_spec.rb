@@ -38,4 +38,10 @@ RSpec.describe RubyAbilityGraph::TableFormatter do
   it "handles an empty result set without dividing by zero" do
     expect(described_class.call([])).to include("0/0 resolved (0%)")
   end
+
+  it "strips control characters from a condition before printing it" do
+    tricky = [{ "role" => "admin", "action" => "read", "model" => "Document", "allowed" => true,
+                "confidence" => "resolved", "condition" => { "note" => "x\e[31m" } }]
+    expect(described_class.call(tricky)).not_to include("\e")
+  end
 end

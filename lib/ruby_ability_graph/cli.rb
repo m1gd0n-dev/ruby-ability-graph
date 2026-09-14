@@ -28,6 +28,8 @@ module RubyAbilityGraph
       when "inspect" then inspect_ability(rest)
       else warn USAGE and exit(1)
       end
+    rescue OptionParser::ParseError => e
+      abort(e.message)
     end
 
     private
@@ -36,18 +38,18 @@ module RubyAbilityGraph
       options, app_path = RubyAbilityGraph::ScanOptions.parse(argv)
       roles = load_roles(options[:roles_file], app_path)
       results = RubyAbilityGraph::Harness.new(**harness_kwargs(options, app_path, roles)).run
-      violations = load_policy_violations(options[:policy_file], app_path, results)
-      output_results(options, app_path, results, violations)
+      policy_report = load_policy_report(options[:policy_file], app_path, results)
+      output_results(options, app_path, results, policy_report)
     end
 
-    def output_results(options, app_path, results, violations)
-      write_html_report(options[:html_report], app_path, results, violations)
+    def output_results(options, app_path, results, policy_report)
+      write_html_report(options[:html_report], app_path, results, policy_report)
 
       presenter = RubyAbilityGraph::ScanPresenter.new(
-        format: options[:format], results: results, violations: violations
+        format: options[:format], results: results, policy_report: policy_report
       )
       puts presenter.render
-      exit(1) if presenter.violations?
+      exit(1) if presenter.problems?
     end
 
     # rails_env/ruby_bin are only included when set at all, so Harness's own
@@ -64,22 +66,31 @@ module RubyAbilityGraph
 
     # nil (not merely empty) means "no --policy-file given" -- ScanPresenter
     # uses that distinction to decide whether to print a policy section at all.
-    def load_policy_violations(policy_file, app_path, results)
+    def load_policy_report(policy_file, app_path, results)
       return nil unless policy_file
 
       path = File.expand_path(policy_file, app_path)
       abort("No policy file found at #{path}.") unless File.exist?(path)
 
-      policies = YAML.safe_load_file(path)["policies"] || []
-      RubyAbilityGraph::PolicyChecker.call(policies: policies, results: results)
+      RubyAbilityGraph::PolicyChecker.call(policies: parse_policy_file(path), results: results)
+    end
+
+    def parse_policy_file(path)
+      data = YAML.safe_load_file(path)
+      abort("Policy file #{path} must be a YAML mapping with a top-level `policies:` list.") unless data.is_a?(Hash)
+
+      data["policies"] || []
+    rescue Psych::SyntaxError => e
+      abort("Failed to parse policy file #{path}: #{e.message}")
     end
 
     # Written to stderr, not stdout -- keeps `--format json` pipeable without
     # this confirmation line landing in the middle of the JSON payload.
-    def write_html_report(html_report, app_path, results, violations)
+    def write_html_report(html_report, app_path, results, policy_report)
       return unless html_report
 
       path = File.expand_path(html_report, app_path)
+      violations = policy_report&.violations
       File.write(path, RubyAbilityGraph::HtmlReport.call(results: results, violations: violations))
       warn "HTML report written to #{path}"
     end

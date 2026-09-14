@@ -1,0 +1,3 @@
+- model: Document
+  action: read
+  allowed_roles: [admin]
