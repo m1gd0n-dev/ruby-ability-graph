@@ -1,0 +1,4 @@
+policies:
+  - model: Payment
+    action: read
+    allowed_roles: [admin]

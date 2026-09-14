@@ -14,25 +14,29 @@ RSpec.describe RubyAbilityGraph::PolicyChecker do
 
   it "flags a role that is allowed but not in allowed_roles" do
     policies = [{ "model" => "Document", "action" => "read", "allowed_roles" => ["admin"] }]
-    violations = described_class.call(policies: policies, results: results)
+    report = described_class.call(policies: policies, results: results)
 
-    expect(violations.size).to eq(1)
-    expect(violations.first).to include("role" => "member", "action" => "read", "model" => "Document")
+    expect(report.violations.size).to eq(1)
+    expect(report.violations.first).to include("role" => "member", "action" => "read", "model" => "Document")
+    expect(report.unmatched).to be_empty
   end
 
   it "does not flag a role that is allowed and in allowed_roles" do
     policies = [{ "model" => "Document", "action" => "read", "allowed_roles" => %w[admin member] }]
-    expect(described_class.call(policies: policies, results: results)).to be_empty
+    expect(described_class.call(policies: policies, results: results).violations).to be_empty
   end
 
   it "does not flag a role that isn't actually allowed, even if absent from allowed_roles" do
     policies = [{ "model" => "Document", "action" => "destroy", "allowed_roles" => ["admin"] }]
-    expect(described_class.call(policies: policies, results: results)).to be_empty
+    expect(described_class.call(policies: policies, results: results).violations).to be_empty
   end
 
-  it "ignores policies with no matching results" do
+  it "reports a policy with no matching results as unmatched, not clean" do
     policies = [{ "model" => "Report", "action" => "read", "allowed_roles" => ["admin"] }]
-    expect(described_class.call(policies: policies, results: results)).to be_empty
+    report = described_class.call(policies: policies, results: results)
+
+    expect(report.violations).to be_empty
+    expect(report.unmatched).to eq(policies)
   end
 
   it "handles multiple policies independently" do
@@ -40,7 +44,7 @@ RSpec.describe RubyAbilityGraph::PolicyChecker do
       { "model" => "Document", "action" => "read", "allowed_roles" => ["admin"] },
       { "model" => "Document", "action" => "destroy", "allowed_roles" => ["admin"] }
     ]
-    violations = described_class.call(policies: policies, results: results)
-    expect(violations.map { |v| v["action"] }).to eq(["read"])
+    report = described_class.call(policies: policies, results: results)
+    expect(report.violations.map { |v| v["action"] }).to eq(["read"])
   end
 end

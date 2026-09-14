@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "terminal_safe"
+
 module RubyAbilityGraph
   # Renders scan results (role x action x model rows, string-keyed as they
   # come back from Harness) as a plain-text table -- the human-readable
@@ -32,7 +34,7 @@ module RubyAbilityGraph
     end
 
     def condition_cell(result)
-      result["condition"].nil? ? "-" : result["condition"].to_s
+      result["condition"].nil? ? "-" : TerminalSafe.sanitize(result["condition"])
     end
 
     def separator_cells(widths)

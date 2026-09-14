@@ -6,6 +6,10 @@ module RubyAbilityGraph
   # actually reach something the policy doesn't expect. Policy language is
   # deliberately flat -- model + action + allowed_roles, no nested logic.
   class PolicyChecker
+    # unmatched: policies whose model/action matched zero scan results (e.g. a
+    # typo) -- kept separate from violations so that case can't read as "clean".
+    Report = Struct.new(:violations, :unmatched, keyword_init: true)
+
     def self.call(policies:, results:)
       new(policies: policies, results: results).call
     end
@@ -16,23 +20,29 @@ module RubyAbilityGraph
     end
 
     def call
-      @policies.flat_map { |policy| violations_for(policy) }
+      violations = []
+      unmatched = []
+
+      @policies.each do |policy|
+        matches = matching_results(policy)
+        matches.empty? ? unmatched << policy : violations.concat(violations_for(policy, matches))
+      end
+
+      Report.new(violations: violations, unmatched: unmatched)
     end
 
     private
 
-    def violations_for(policy)
+    def matching_results(policy)
       model = policy["model"].to_s
       action = policy["action"].to_s
-      allowed_roles = Array(policy["allowed_roles"]).map(&:to_s)
-
-      matching_results(model, action)
-        .select { |r| r["allowed"] && !allowed_roles.include?(r["role"]) }
-        .map { |r| build_violation(r, allowed_roles) }
+      @results.select { |r| r["model"] == model && r["action"] == action }
     end
 
-    def matching_results(model, action)
-      @results.select { |r| r["model"] == model && r["action"] == action }
+    def violations_for(policy, matches)
+      allowed_roles = Array(policy["allowed_roles"]).map(&:to_s)
+      matches.select { |r| r["allowed"] && !allowed_roles.include?(r["role"]) }
+             .map { |r| build_violation(r, allowed_roles) }
     end
 
     def build_violation(result, allowed_roles)
