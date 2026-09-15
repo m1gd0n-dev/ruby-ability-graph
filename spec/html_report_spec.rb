@@ -72,6 +72,12 @@ RSpec.describe RubyAbilityGraph::HtmlReport do
     expect(data["violationCount"]).to eq(0)
   end
 
+  it "colors bundled edges proportionally rather than all-or-nothing" do
+    html = described_class.call(results: results)
+    expect(html).to include("function edgeAppearance")
+    expect(html).to include("function mixColor")
+  end
+
   it "escapes a literal </script> inside a condition so it can't close the inline script early" do
     tricky_results = [
       { "role" => "admin", "action" => "read", "model" => "Document", "allowed" => true,

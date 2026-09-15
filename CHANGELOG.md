@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- `--html-report`: aggregated role→action and action→model edges no longer
+  paint the whole bundle amber over a single unsupported row. Edge color now
+  reflects the fraction of the bundle that's resolved.
+
 ## [0.1.1] - 2026-09-15
 
 ### Changed

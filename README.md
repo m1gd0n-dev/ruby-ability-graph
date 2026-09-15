@@ -145,7 +145,7 @@ Note: a policy check is only as trustworthy as the underlying result's `confiden
 ruby-ability-graph scan APP_PATH --html-report report.html
 ```
 
-Writes a single, self-contained HTML file -- inlined CSS/JS, no server, no CDN assets, nothing fetched over the network -- showing an interactive role → action → resource graph. Hover a role to trace everything it can reach; hover an edge for the underlying condition and confidence. Edges are solid green where `resolved`, dashed amber where `unsupported`, and solid red where a `--policy-file` check (if given) found a violation. A coverage line at the top mirrors the table's resolved/total summary. Only `allowed: true` results become edges -- it's a "who can access what" diagram, not a dump of every denial.
+Writes a single, self-contained HTML file -- inlined CSS/JS, no server, no CDN assets, nothing fetched over the network -- showing an interactive role → action → resource graph. Hover a role to trace everything it can reach; hover an edge for the underlying condition and confidence. Each edge bundles many underlying rows (a role→action edge spans every model that pair touches), so its color reflects the fraction resolved: solid green at 100%, solid amber-to-green gradient in between, dashed amber at 0% (`unsupported`), and solid red wherever a `--policy-file` check (if given) found a violation. A coverage line at the top mirrors the table's resolved/total summary. Only `allowed: true` results become edges -- it's a "who can access what" diagram, not a dump of every denial.
 
 ![Example HTML report graph](docs/images/html-report.png)
 
