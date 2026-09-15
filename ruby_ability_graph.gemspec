@@ -10,8 +10,8 @@ Gem::Specification.new do |spec|
   spec.summary = "Maps CanCanCan authorization rules into a visual 'who can access what' model."
   spec.description = <<~DESC
     ruby_ability_graph loads a Rails app's CanCanCan Ability class in isolation,
-    enumerates roles x actions x models, and reports resolved permissions --
-    distinguishing patterns it can fully resolve from ones it doesn't support.
+    enumerates roles x actions x models, and reports resolved permissions.
+    Distinguishes patterns it can fully resolve from ones it doesn't support.
   DESC
   spec.homepage = "https://github.com/m1gd0n-dev/ruby-ability-graph"
   spec.license = "AGPL-3.0-or-later"

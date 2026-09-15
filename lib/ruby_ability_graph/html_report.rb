@@ -73,6 +73,7 @@ module RubyAbilityGraph
         #legend span { display: inline-flex; align-items: center; gap: 6px; }
         .swatch { display: inline-block; width: 22px; height: 0; border-top-width: 3px; border-top-style: solid; }
         .swatch.resolved { border-color: var(--good); border-top-style: solid; }
+        .swatch.partial { height: 3px; border-top: none; background: linear-gradient(to right, var(--warning), var(--good)); }
         .swatch.unsupported { border-color: var(--warning); border-top-style: dashed; }
         .swatch.violation { border-color: var(--critical); border-top-style: solid; }
         main {
@@ -123,6 +124,7 @@ module RubyAbilityGraph
           </div>
           <div id="legend">
             <span><span class="swatch resolved"></span> Resolved</span>
+            <span><span class="swatch partial"></span> Bundled edge, partially resolved -- color shows % resolved</span>
             <span><span class="swatch unsupported"></span> Unsupported -- not analyzed</span>
             <span><span class="swatch violation"></span> Policy violation</span>
           </div>
@@ -165,9 +167,30 @@ module RubyAbilityGraph
             return map;
           }
 
-          function edgeStatus(rows) {
-            if (rows.some(function (r) { return r.violation; })) { return "violation"; }
-            return rows.every(function (r) { return r.confidence === "resolved"; }) ? "resolved" : "unsupported";
+          // Aggregated edges bundle many rows (e.g. a role->action edge spans every
+          // model that pair touches). A single boolean verdict for the whole bundle
+          // is misleading at scale: one unsupported row among sixty resolved ones
+          // painted the entire edge amber. Color proportionally instead, so an
+          // edge that's mostly resolved reads as mostly green.
+          var COLOR_WARNING = [250, 178, 25]; // --warning, #fab219
+          var COLOR_GOOD = [12, 163, 12]; // --good, #0ca30c
+
+          function resolvedFraction(rows) {
+            var resolved = rows.filter(function (r) { return r.confidence === "resolved"; }).length;
+            return resolved / rows.length;
+          }
+
+          function mixColor(fraction) {
+            var rgb = COLOR_WARNING.map(function (c, i) { return Math.round(c + (COLOR_GOOD[i] - c) * fraction); });
+            return "rgb(" + rgb.join(",") + ")";
+          }
+
+          function edgeAppearance(rows) {
+            if (rows.some(function (r) { return r.violation; })) { return { cls: "violation" }; }
+            var fraction = resolvedFraction(rows);
+            if (fraction === 1) { return { cls: "resolved" }; }
+            if (fraction === 0) { return { cls: "unsupported" }; }
+            return { cls: "partial", style: "stroke:" + mixColor(fraction) + ";" };
           }
 
           function groupBy(rows, keyFn, shapeFn) {
@@ -240,10 +263,13 @@ module RubyAbilityGraph
 
             function drawEdge(x1, y1, x2, y2, statusRows, store, key) {
               var midX = (x1 + x2) / 2;
-              var path = svgEl("path", {
-                "class": "edge " + edgeStatus(statusRows),
+              var appearance = edgeAppearance(statusRows);
+              var attrs = {
+                "class": "edge " + appearance.cls,
                 d: "M " + x1 + "," + y1 + " C " + midX + "," + y1 + " " + midX + "," + y2 + " " + x2 + "," + y2
-              });
+              };
+              if (appearance.style) { attrs.style = appearance.style; }
+              var path = svgEl("path", attrs);
               svg.appendChild(path);
               store[key] = path;
               return path;
@@ -353,14 +379,22 @@ module RubyAbilityGraph
               return bits.join(" ");
             }
 
+            function edgeHeader(a, b, rows) {
+              var resolved = rows.filter(function (r) { return r.confidence === "resolved"; }).length;
+              var header = a + " → " + b + " -- " + resolved + "/" + rows.length + " resolved";
+              var violationCount = rows.filter(function (r) { return r.violation; }).length;
+              if (violationCount) { header += ", " + violationCount + " violation(s)"; }
+              return header;
+            }
+
             function raTooltip(edge) {
-              return [edge.role + " → " + edge.action]
+              return [edgeHeader(edge.role, edge.action, edge.rows)]
                 .concat(edge.rows.map(function (r) { return rowLine(r.model, r); }))
                 .join("\n");
             }
 
             function amTooltip(edge) {
-              return [edge.action + " → " + edge.model]
+              return [edgeHeader(edge.action, edge.model, edge.rows)]
                 .concat(edge.rows.map(function (r) { return rowLine(r.role, r); }))
                 .join("\n");
             }
