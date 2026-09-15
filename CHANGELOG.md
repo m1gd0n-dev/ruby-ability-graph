@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.1] - 2026-09-15
+
+### Changed
+- README: add a screenshot of the `--html-report` graph.
+- Gemspec: tighten summary/description wording.
+
 ## [0.1.0] - 2026-09-14
 
 Initial release.
