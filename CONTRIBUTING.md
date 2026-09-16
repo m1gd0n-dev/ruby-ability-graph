@@ -8,23 +8,24 @@ bundle exec rspec
 bundle exec rubocop
 ```
 
-PRs must pass both before merge (see `.github/workflows/ci.yml`).
+Please make sure both checks pass before opening a PR. The CI workflow lives in `.github/workflows/ci.yml`.
 
-## What's welcome
+## Contributions welcome
 
 - Bug fixes.
-- Additional CanCanCan pattern coverage within the existing `resolved`/`unsupported`
-  model (e.g. a hash-condition shape that should resolve but doesn't).
-- Fixture coverage against real-world `Ability` classes.
-- Docs.
+- More CanCanCan pattern coverage within the existing `resolved`/`unsupported`
+  model. For example, a hash condition that should resolve but currently does not.
+- Fixtures based on real-world `Ability` classes.
+- Documentation improvements.
 
-## What's not
+## Out of scope
 
-PRs implementing resolution for block conditions, association-chained conditions,
-or dynamic/computed rule generation won't be merged -- these are deliberately kept
-`unsupported` rather than guessed at. See the README's "Status" section for the
-resolved/unsupported boundary this project maintains.
+This project intentionally does not try to resolve block conditions,
+association-chained conditions, or dynamically generated rules. The scanner marks
+them as `unsupported`, so PRs that add resolution for them are out of scope. The
+README's "Status" section explains where that boundary is.
 
 ## Response time
 
-Solo-maintained. No SLA -- I'll get to issues and PRs when I can.
+This is a solo-maintained project. There is no response-time guarantee, but I will
+get to issues and PRs when I can.
