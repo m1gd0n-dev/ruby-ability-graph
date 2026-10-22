@@ -1,6 +1,6 @@
 # frozen_string_literal: true -- (n/a, just a marker for editors)
 
-FROM ruby:4.0-slim@sha256:607bf92fa7ecebb4a0c6654b62cb44c48d94b36b6f5a754611ddbbe3dc5b6135
+FROM ruby:4.0.7-slim-trixie@sha256:6c6b7b8c7d750604178aa60c2fa436890cd17c5695bdbd3213db2e4efbf98eb9
 
 RUN apt-get update -qq \
     && apt-get install -y --no-install-recommends build-essential git \
